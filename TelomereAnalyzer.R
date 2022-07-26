@@ -507,6 +507,16 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
 
 
 
+Find_Telorette <- function(read_subseq, telorette_pattern)
+{
+  for(i in 0:15){
+    current_telorete <- matchPattern(pattern = telorette_pattern, subject = read_subseq, max.mismatch = i, with.indels = T)
+    if(length(current_telorete) > 0) { break}
+  }
+  return(current_telorete)
+}
+
+
 
 
 
@@ -551,8 +561,10 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
     analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density)
     
     #list_CurrentDens_MP <- get_densityIRanges(current_seq, patterns = PATTERNS_LIST) # to remove: last_100_density = double(), total_density = double(),
-    current_telorete <- matchPattern(pattern = telorete_pattern, 
-                                     subject = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)), max.mismatch = 14, with.indels = TRUE)
+    #current_telorete <- matchPattern(pattern = telorete_pattern, 
+    #                                 subject = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)), max.mismatch = 14, with.indels = TRUE)
+    
+    current_telorete <- Find_Telorette(read_subseq = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)) , telorette_pattern = telorete_pattern)
     
     
     telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
@@ -738,6 +750,14 @@ ggplot(plot_df100 , aes(x = start_index, y = density )) + geom_area(colour = "re
 # try to adjust the telomere start/end indices using the IRanges indices + telorete_startIndex
 df<-data.frame(Serial = integer(), sequence_ID = character(), sequence_length = integer(),  telo_density = double(),
                Telorette3 = logical(), Telorette3Start_index = integer(), Telorette_seq = character(), Telomere_start = integer(), Telomere_end = integer(), Telomere_length = integer())
+
+
+# create a function which search for the Telorette with more accuracy
+
+
+current_telorete <- Find_Telorette(read_subseq = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)) , telorette_pattern = the_telorete_pattern)
+                                 
+
 
 
 # add telo density : get_sub_density <- function(sub_irange, ranges){
