@@ -467,6 +467,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     
     
     irange_telo <- analyze_list[[2]][[2]]
+    if(width(telo_irange) < 100 ) {next} # not considered a Telomere
     s_index <- start(telo_irange) 
     # make the strat/end more accurate (usethe IRanges for the patterns)
     iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
@@ -477,7 +478,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     if(length(iranges_end) >0 ) {end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
     
     
-    if(width(telo_irange) < 100 ) {next} # not considered a Telomere
+    
     telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
     
     df <- df %>%
@@ -570,6 +571,7 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
     telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
     
     irange_telo <- analyze_list[[2]][[2]]
+    if(width(telo_irange) < 100 ) {next} # not considered a Telomere
     s_index <- start(telo_irange) 
     # make the strat/end more accurate (usethe IRanges for the patterns)
     iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100))  # change to 20 if subseq == 20
@@ -581,7 +583,7 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
     
     
     
-    if(width(telo_irange) < 100 ) {next} # not considered a Telomere
+    
     
     if(length(current_telorete)){ # The telorrete was found
       telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
@@ -635,15 +637,6 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
 
 
 
-
-
-
-
-
-
-
-############################ code for 30.01 #########################################################
-
 # need to create parApply for filter 
 library("parallel")
 filter_density <- function(sequence, patterns, min_density = 0.18){
@@ -668,8 +661,18 @@ filter_density <- function(sequence, patterns, min_density = 0.18){
 }
 
 
-
+# need to correct the spelling for telorette
 run_with_rc_and_filter <- function(samples,  patterns, output_dir, telorrete_pattern){
+  #' @title: Run a search for Telomeric sequences on the reads   
+  #' @description use rc to adjust for the patterns and barcode/telorette locatio ( should be at the last ~ 60-70 bases), filter out reads with no 
+  #'              no telomeric pattern at the edge and run searchPatterns_withTelorette  
+  #' @usage 
+  #' @param samples: A DNAStringSet of reads
+  #' @param patterns: The patterns for the telomere
+  #' @param output_dir: The path for the output directory
+  #' @param telorrete_pattern: The telorette pattern
+  #' @return
+  #' @examples
   samps_1000 <- samples[width(samples) >= 1e3]
   samps_1000 <- reverseComplement(samps_1000)
   copies_of_r <- 10
@@ -691,7 +694,7 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, telorrete_pat
 }
 
 
-
+################## Arguments ######################################################
 
 PATTERNS_LIST <- list("CCCTAA", "CCCTAG", "CCCTGA", "CCCTGG")  # CCCTRR
 PATTERNS_LIST <- append(PATTERNS_LIST, list("CCTAAC", "CCTAGC", "CCTGAC", "CCTGGC")) # add CCTRRC
@@ -706,245 +709,6 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 the_telorete_pattern = "TGCTCCGTGCATCTCCAAGGTTCTAACC"
 the_telorete_pattern <- toString(reverseComplement(DNAString(the_telorete_pattern)))
-
-
-
-################## test new plots 26/07/2022 ################
-
-## Work for today: 1. make it a plot fron subseq of 20, 2. take the Iranges and use it to find the first index of the patterns within the telomere start
-# , 3.exclude the telorette+barcode from the plot/seq_length ,( 1+2+3 will make the telomere length more accurate: from 100B error to less then 5B error in length)
-# 4.Make an option to find all the 6 different telorettes , 5. change the subs data frame: add indices of start/end of patterns within each sub-seq
-
-
-filepath1 = "/home/lab/Downloads/Telomers/Trial10 2022_06_15_1335_MN34594_FAS36701_5116e444/output_bc03/reads__bc03_pass.fasta"
-filepath2 = "/home/lab/Downloads/Telomers/Trial10 2022_06_15_1335_MN34594_FAS36701_5116e444/pass-20220707T125428Z-001/pass/barcode03/output/reads_bc03_un_mixed.fasta"
-x_covered <- readDNAStringSet(filepath = c(filepath1, filepath2))
-name_c <- "49f23ce2-8000-4c65-8790-91ecc042855f runid=7603663a2adec7cf9ecee66b7cd4a81aa9032d9a sampleid=no_sample read=69258 ch=104 start_time=2022-06-15T21:19:05Z model_version_id=2021-05-17_dna_r9.4.1_minion_768_2f1c8637 barcode=barcode03"
-name_l = "c748e9a4-5166-4a97-9be7-3f9774df17c0 runid=7603663a2adec7cf9ecee66b7cd4a81aa9032d9a read=39099 ch=340 start_time=2022-06-16T00:42:45.655343+03:00 flow_cell_id=FAS36701 protocol_group_id=10KKbtMEFsMMpd110 sample_id=no_sample barcode=barcode03 barcode_alias=barcode03 parent_read_id=c748e9a4-5166-4a97-9be7-3f9774df17c0 basecall_model_version_id=2021-05-17_dna_r9.4.1_minion_384_d37a2ab9"
-x_covered <- x_covered[which(names(x_covered) %in% c(name_c, name_l))] # this is the plot 55 in the mixed_bc03 from Trial10 which Dudy toled me 
-# See this telomere. 130K! but the label is covering the graph !
-x_covered <- reverseComplement(x_covered) # needed since it will be rc again !
-
-setwd("/home/lab/Downloads/Telomers/plot_test")
-
-dir.create("output_plotTest")
-run_with_rc_and_filter(samples = x_covered, patterns = dna_rc_patterns,
-                       output_dir = "output_plotTest",
-                       telorrete_pattern = the_telorete_pattern )
-
-
-# now try diff plots
-
-plot_df <- read_csv(file = "/home/lab/Downloads/Telomers/plot_test/output_plotTest/output_sub20_AdjustTelomerePosition/single_read_plots_adj/read1.csv")
-ggplot(plot_df , aes(x = start_index, y = density)) + geom_area(colour = "red", fill = "red")
-
-
-plot_df100 <- read_csv(file = "/home/lab/Downloads/Telomers/plot_test/output_plotTest/old_output/single_read_plots/read1.csv")
-ggplot(plot_df100 , aes(x = start_index, y = density )) + geom_area(colour = "red", fill = "red") +  
-  scale_x_continuous(name="Position", limits=c(1, 123501), breaks = seq(10000, 123501, by = 10000)) +
-  theme_light() + legend() # how to inser a legend ???????
-
-
-
-
-# try to adjust the telomere start/end indices using the IRanges indices + telorete_startIndex
-df<-data.frame(Serial = integer(), sequence_ID = character(), sequence_length = integer(),  telo_density = double(),
-               Telorette3 = logical(), Telorette3Start_index = integer(), Telorette_seq = character(), Telomere_start = integer(), Telomere_end = integer(), Telomere_length = integer())
-
-
-# create a function which search for the Telorette with more accuracy
-
-
-current_telorete <- Find_Telorette(read_subseq = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)) , telorette_pattern = the_telorete_pattern)
-                                 
-
-
-
-# add telo density : get_sub_density <- function(sub_irange, ranges){
-LargeDNAStringSet <- DNAStringSet() # For the fasta output of the reads which pass the filter
-current_serial <- serial_start
-
-
-  current_fastq_name <- names(x_covered[1])
-  current_seq <- unlist(x_covered[1])
-  current_seq <- Biostrings::reverseComplement(current_seq)
-  # we skip the adaptor and telorete so we start with base 57
-  
-  
-  # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
-  analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  dna_rc_patterns, MIN_DENSITY = 0.18)
-  
-  #list_CurrentDens_MP <- get_densityIRanges(current_seq, patterns = PATTERNS_LIST) # to remove: last_100_density = double(), total_density = double(),
-  current_telorete <- matchPattern(pattern = the_telorete_pattern, 
-                                   subject = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)), max.mismatch = 11, with.indels = T)
-  
-  
-  # for the telorete : 3 stage: first whith indels, and max.mismatch == 5, ... last with indels , max.mismatch == 14 : use the width (max width ) to select the irange
-  telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
-  
-  
-  
-  
-  irange_telo <- analyze_list[[2]][[2]]
-  s_index <- start(telo_irange) # 100401 
-  iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) # 100 or 20 ( The length of the subseq)
-  if(length(iranges_start) > 0){ s_index <- start(irange_telo[iranges_start[1]])} # fixed to 100439
-  
-  
-  
-  e_index <- end(telo_irange) # 124142
-  iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-  if(length(iranges_end) >0 ) {e_index <- end(irange_telo[iranges_end[1]])} # fixed to 124060
-  # There is improvment of 118B at Telomere length for this example.
-  
-  # chech the se itself : old_start_end = [ 100401, 124142], new_start_end = [100439, 124060 ]
-  Biostrings::subseq(x = current_seq, start = 100401, width = 100)
-  
-  # IRanges: find IRange which is within other IRange
-  
-  
-  
-  
-  
-  which(start(irange_telo) <= start(telo_irange) + 20 && start(irange_telo) >= start(telo_irange) )
-  
-  
-  if(width(telo_irange) < 100 ) {next} # not considered a Telomere
-  
-  if(length(current_telorete)){ # The telorrete was found
-    telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
-    " check if the telomre starts after the tellorete.. for meanwhile don't do it....
-        # check if the telomre starts after the tellorete
-        if( start(telo_irange) <= end(current_telorete[[1]]) ){ # check if the telorrete is before the start of the Telomere
-          new_start <- end(current_telorete[[1]]) + 1
-          if(end(telo_irange) <= new_start) { # The tellorete was found after the telomere
-            
-            ##################### CHECH IN THE FUTURE ###################
-            if( width(telo_irange) < 200 ) {next}# won't be considered Telomere, COULD BE PROBLEMATIC IF WE HAVE TO SUBSEQUENCES WHICH CAN BE TELOMERES
-            # else we leave it to be before the telorette
-          }
-          else{ # update the start of the Telo after the telorrete 
-            telo_irange <- IRanges(start = new_start, end = end(telo_irange))
-          }
-        }
-        "              # to remove: last_100_density = double(), total_density = double(),
-    df <- df %>% add_row(Serial = current_serial, sequence_ID = current_fastq_name, sequence_length = length(current_seq), telo_density = telo_density,
-                         Telorette3 = TRUE, Telorette3Start_index = start(current_telorete[1]) + length(current_seq) -87,
-                         Telorette_seq = toString(unlist((current_telorete[1]))), Telomere_start = start(telo_irange), Telomere_end = end(telo_irange), Telomere_length = width(telo_irange))  
-  }
-
-
-
-################## End of test new plots 26/07/2022 ################
-
-
-
-
-
-
-
-
-
-#################### Trial 12  20.07.2022 #################
-setwd("/home/lab/Downloads/Telomers/Trial 12/prelog/barcode01")
-bc01 <-  readDNAStringSet(dir(), format = "fastq")
-dir.create("output_bc01")
-run_with_rc_and_filter(samples = bc01, patterns = dna_rc_patterns,
-                       output_dir = "output_bc01",
-                       telorrete_pattern = the_telorete_pattern)
-
-setwd("/home/lab/Downloads/Telomers/Trial 12/prelog/barcode02")
-bc02 <-  readDNAStringSet(dir(), format = "fastq")
-dir.create("output_bc02")
-run_with_rc_and_filter(samples = bc02, patterns = dna_rc_patterns,
-                       output_dir = "output_bc02",
-                       telorrete_pattern = the_telorete_pattern)
-
-setwd("/home/lab/Downloads/Telomers/Trial 12/prelog/barcode03")
-bc03 <-  readDNAStringSet(dir(), format = "fastq")
-dir.create("output_bc03")
-run_with_rc_and_filter(samples = bc03, patterns = dna_rc_patterns,
-                       output_dir = "output_bc03",
-                       telorrete_pattern = the_telorete_pattern)
-###########################################################
-
-
-#################### test 3 12.07.2022 #######################
-test <- readDNAStringSet(filepath = "/home/lab/Downloads/Telomers/Trial7B/barcode01/test2/reads.fasta", format = 'fasta')
-test <- reverseComplement(test)
-setwd("/home/lab/Downloads/Telomers/Trial7B/barcode01/test2")
-run_with_rc_and_filter(samples = test, patterns = dna_rc_patterns,
-                       output_dir = "output",
-                       telorrete_pattern = the_telorete_pattern)
-
-
-
-######################## 16.06.2022: 1335_MN34594_FAS36701_5116e444 ###########################################
-
-# bc01
-bc1_0 <- readDNAStringSet(filepath = "barcode01/FAS36701_pass_barcode01_7603663a_0.fastq.gz", format = 'fastq') 
-bc1_1 <- readDNAStringSet(filepath = "barcode01/FAS36701_pass_barcode01_7603663a_1.fastq.gz", format = 'fastq')   
-bc1_2 <- readDNAStringSet(filepath =  "barcode01/FAS36701_pass_barcode01_7603663a_2.fastq.gz", format = 'fastq') 
-bc1_3 <- readDNAStringSet(filepath = "barcode01/FAS36701_pass_barcode01_7603663a_3.fastq.gz", format = 'fastq') 
-bc1_all <- append(x = append(bc1_0, bc1_1), append(bc1_2, bc1_3))
-
-run_with_rc_and_filter(samples = bc1_all, patterns = dna_rc_patterns,
-                       output_dir = "output_bc01",
-                       telorrete_pattern = the_telorete_pattern)
-
-
-#bc 02
-bc2_0 <- readDNAStringSet(filepath = "barcode02/FAS36701_pass_barcode02_7603663a_0.fastq.gz", format = 'fastq') 
-bc2_1 <- readDNAStringSet(filepath = "barcode02/FAS36701_pass_barcode02_7603663a_1.fastq.gz", format = 'fastq')
-bc2_2 <- readDNAStringSet(filepath = "barcode02/FAS36701_pass_barcode02_7603663a_2.fastq.gz" , format = 'fastq')
-bc2_3 <- readDNAStringSet(filepath ="barcode02/FAS36701_pass_barcode02_7603663a_3.fastq.gz" , format = 'fastq') 
-bc2_4 <- readDNAStringSet(filepath ="barcode02/FAS36701_pass_barcode02_7603663a_4.fastq.gz" , format = 'fastq')
-bc2_5 <- readDNAStringSet(filepath = "barcode02/FAS36701_pass_barcode02_7603663a_5.fastq.gz", format = 'fastq')
-bc2_all <- append(x = append(bc2_0, bc2_1), append(append(bc2_2, bc2_3), append(bc2_4, bc2_5) ) )
-
-run_with_rc_and_filter(samples = bc2_all, patterns = dna_rc_patterns,
-                       output_dir = "output_bc02",
-                       telorrete_pattern = the_telorete_pattern)
-
-
-
-
-# bc 03
-bc3_0 <- readDNAStringSet(filepath = "barcode03/FAS36701_pass_barcode03_7603663a_0.fastq.gz", format = 'fastq') 
-bc3_1 <- readDNAStringSet(filepath = "barcode03/FAS36701_pass_barcode03_7603663a_1.fastq.gz", format = 'fastq')
-
-bc3_all <- append(bc3_0, bc3_1)
-
-run_with_rc_and_filter(samples = bc3_all, patterns = dna_rc_patterns,
-                       output_dir = "output_bc03",
-                       telorrete_pattern = the_telorete_pattern)
-
-run_with_rc_and_filter(samples = bc1_all, patterns = dna_rc_patterns,
-                       output_dir = "output_bc01",
-                       telorrete_pattern = the_telorete_pattern)
-
-
-
-# now run fail fastq
-bc1_fail <-  readDNAStringSet(filepath = "barcode01_FAILED/FAS36701_fail_barcode01_7603663a_0.fastq.gz" , format = 'fastq') 
-run_with_rc_and_filter(samples = bc1_fail, patterns = dna_rc_patterns,
-                       output_dir = "failed_1" ,
-                       telorrete_pattern = the_telorete_pattern)
-
-bc2_fail <-  readDNAStringSet(filepath = "barcode02FAIL/FAS36701_fail_barcode02_7603663a_0.fastq.gz"   , format = 'fastq') 
-run_with_rc_and_filter(samples = bc2_fail, patterns = dna_rc_patterns,
-                       output_dir = "failed_2" ,
-                       telorrete_pattern = the_telorete_pattern)
-
-bc3_fail <-  readDNAStringSet(filepath = "barcode03FAIL/FAS36701_fail_barcode03_7603663a_0.fastq.gz" , format = 'fastq') 
-run_with_rc_and_filter(samples = bc3_fail, patterns = dna_rc_patterns,
-                       output_dir = "failed_3" ,
-                       telorrete_pattern = the_telorete_pattern)
-
-
-
-######################## END 16.06.2022: 1335_MN34594_FAS36701_5116e444 ###########################################
-
 
 
 
