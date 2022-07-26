@@ -85,12 +85,15 @@
 # 5. summarise resullts and plot the telomeres
 # 7. need to use the "cutter for barcode" and also cut the telorette from the sequence !!!!!( since it can be identified as subtelomeric region ): did it with telorette - need to add barcode option
 # 8. add a sub-telomeric only fasta/fastq file output    
-# 9. try maybe to use library(microseq) for fastq file output
-# 10. try using library(microseq) readFastq and use the Quality for more accurate .... or the XStringQuality-class {Biostrings} readDNAStringSet(with.qualities = TRUE, ....)
+# 9. try maybe to use library(microseq) for fastq file output / Or ShortRead ( see Datacap intro to Bioconductor in R chapter 4)
+# 10. try using library(microseq) readFastq and use the Quality for more accurate Or use ShortRead ( see intro to Bioconductor in R) .... or the XStringQuality-class {Biostrings} readDNAStringSet(with.qualities = TRUE, ....)
 # 11. need to add option: search for all 6 types of telorette for a higher chance of finding one
 # 12. add another fasta/fastq file -> telomere_trimed for the mapping to the genome 
 # 13. Try QualityScaledDNAStringSet()
-# 14.  # change to -(61+ ( barcode_telorette == 61)) at run_with_rc_and_filer
+# 14.  # change to -(61+ ( barcode_telorette == 61)) at run_with_rc_and_filer - done !
+# 15. There is a bug if the DNAstringSet is of length == 1
+# 16. I need to adjust the sub-seq length ( 100 if length >= 40,000 , 20)
+
 library(BiocManager)
 library('BSgenome')
 library('stringr')
@@ -109,33 +112,6 @@ library("parallel")
 #' @examples
 
 
-
-# Do I need this function ?
-extract_ranges <- function(matches){
-  #' @title extract IRanges from XStringViews/MIndex
-  #' @description  This fuction gets an XStringViews of matches for a pattern and returns an IRanges object for the matches.
-  #' @param matches: 
-  #' @return 
-  #' @examples
-  start_idx <- start(matches)
-  end_idx <- end(matches)
-  return(IRanges(start = start_idx, end =end_idx))
-}
-
-
-# could be usefull ???????????
-plotRanges <- function(x, xlim=x, main=deparse(substitute(x)), col="black", sep=0.5, ...){
-  height <- 1
-  if (is(xlim, "IntegerRanges")) xlim <- c(min(start(xlim)), max(end(xlim)))
-  
-  bins <- disjointBins(IRanges(start(x), end(x) + 1))
-  plot.new()
-  plot.window(xlim, c(0, max(bins)*(height + sep)))
-  ybottom <- bins * (sep + height) - height
-  rect(start(x)-0.5, ybottom, end(x)+0.5, ybottom + height, col=col, ...)
-  title(main)
-  axis(1)
-}
 
 
 split_telo <- function(dna_seq, sub_length = 100){
@@ -263,7 +239,7 @@ analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY =
 
 
 # I need to put The CLASSES as an arument ?
-find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, min_density_score = 2){ # find 15 in a row or start , ends with 
+find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, min_density_score = 2){ # 15,10 for sub_length == 20 
   #' @title: Find the position of the Telomere(subsequence) within the seuence.
   #' @description:  Find the start and end indices of the subsequence within the sequence according to a data frame.
   #' @usage 
@@ -373,6 +349,12 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
     jpeg_path <- paste(OUTPUT_JPEGS, paste('read', serial_num, '.jpeg',sep=''), sep='/')  
     jpeg(filename=jpeg_path, width=w, height=h)                                                            
   }
+  
+  
+  # 26-07: my addition: save the csv file subs
+  # write_csv(x = subs, file = paste(OUTPUT_JPEGS, paste('read', serial_num, '.csv',sep=''), sep='/') )
+  
+  
   # give extra x for the legend at the topRigth
   plot(subs$density ~ subs$start_index, type='n', yaxt='n', xaxt='n',ylab='', xlab='', ylim=c(0,1), xlim=c(1,x_length + round(x_length/4.15)) ) 
   # create axes
@@ -426,16 +408,7 @@ filter_first_100 <- function(sequence, patterns, min_density = 0.18, start = 1,e
 }
 
 
-filter_last_n <- function(sequence, patterns, min_density = 0.18, n = 100){
-  current_seq <- unlist(sequence)
-  current_filt_100 <- get_densityIRanges( subseq(current_seq, start = length(current_seq)-n+1, end = length(current_seq) ), patterns = patterns) 
-  if(current_filt_100[[1]] >= min_density){
-    return(TRUE)
-  }
-  else{
-    return(FALSE)
-  }
-}
+
 
 
 
@@ -491,6 +464,19 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
     analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density)
     telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
+    
+    
+    irange_telo <- analyze_list[[2]][[2]]
+    s_index <- start(telo_irange) 
+    # make the strat/end more accurate (usethe IRanges for the patterns)
+    iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
+    if(length(iranges_start) > 0){ start(telo_irange) <- start(irange_telo[iranges_start[1]])} 
+    
+    e_index <- end(telo_irange) 
+    iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
+    if(length(iranges_end) >0 ) {end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+    
+    
     if(width(telo_irange) < 100 ) {next} # not considered a Telomere
     telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
     
@@ -566,10 +552,23 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
     
     #list_CurrentDens_MP <- get_densityIRanges(current_seq, patterns = PATTERNS_LIST) # to remove: last_100_density = double(), total_density = double(),
     current_telorete <- matchPattern(pattern = telorete_pattern, 
-                                     subject = subseq(current_seq, start =length(current_seq) -99, end = length(current_seq)), max.mismatch = 11, with.indels = TRUE)
+                                     subject = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)), max.mismatch = 14, with.indels = TRUE)
     
     
     telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
+    
+    irange_telo <- analyze_list[[2]][[2]]
+    s_index <- start(telo_irange) 
+    # make the strat/end more accurate (usethe IRanges for the patterns)
+    iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100))  # change to 20 if subseq == 20
+    if(length(iranges_start) > 0){ start(telo_irange) <- start(irange_telo[iranges_start[1]])} 
+    
+    e_index <- end(telo_irange) 
+    iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
+    if(length(iranges_end) >0 ) {end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+    
+    
+    
     if(width(telo_irange) < 100 ) {next} # not considered a Telomere
     
     if(length(current_telorete)){ # The telorrete was found
@@ -590,7 +589,7 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
         }
         "              # to remove: last_100_density = double(), total_density = double(),
       df <- df %>% add_row(Serial = current_serial, sequence_ID = current_fastq_name, sequence_length = length(current_seq), telo_density = telo_density,
-                           Telorette3 = TRUE, Telorette3Start_index = start(current_telorete[1]) + length(current_seq) -100,
+                           Telorette3 = TRUE, Telorette3Start_index = start(current_telorete[1]) + length(current_seq) -87,
                            Telorette_seq = toString(unlist((current_telorete[1]))), Telomere_start = start(telo_irange), Telomere_end = end(telo_irange), Telomere_length = width(telo_irange))  
     }
     else{ # no telorrete
@@ -621,13 +620,6 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
   message("Done!") #  now what's left is to extract the sequences from fasta to fasta using the read_names list file ( 3 files )
 } # end of the function searchPatterns  
 
-
-# wraper to searchPatterns
-sp_wraper <- function(args){
-  searchPatterns( sample_telomeres=args$sample , pattern_list = args$patterns, csv_name = args$csv_name,output_dir = args$output_dir,
-                  min_length = args$min_length,max_length = args$max_length, min_density = args$min_density, 
-                  telorete_pattern = args$telorrete, title = args$title )
-}  
 
 
 
@@ -671,7 +663,7 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, telorrete_pat
   copies_of_r <- 10
   
   cl <- makeCluster(copies_of_r)
-  samp_100 <- parLapply(cl, samps_1000, subseq, end = -57, width = 100)  # change to -(61+ ( barcode_telorette == 61))
+  samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  # change to -(61+ just incase there are indels ( barcode_telorette == 61))
   stopCluster(cl)
   
   cl <- makeCluster(copies_of_r)
@@ -702,6 +694,136 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 the_telorete_pattern = "TGCTCCGTGCATCTCCAAGGTTCTAACC"
 the_telorete_pattern <- toString(reverseComplement(DNAString(the_telorete_pattern)))
+
+
+
+################## test new plots 26/07/2022 ################
+
+## Work for today: 1. make it a plot fron subseq of 20, 2. take the Iranges and use it to find the first index of the patterns within the telomere start
+# , 3.exclude the telorette+barcode from the plot/seq_length ,( 1+2+3 will make the telomere length more accurate: from 100B error to less then 5B error in length)
+# 4.Make an option to find all the 6 different telorettes , 5. change the subs data frame: add indices of start/end of patterns within each sub-seq
+
+
+filepath1 = "/home/lab/Downloads/Telomers/Trial10 2022_06_15_1335_MN34594_FAS36701_5116e444/output_bc03/reads__bc03_pass.fasta"
+filepath2 = "/home/lab/Downloads/Telomers/Trial10 2022_06_15_1335_MN34594_FAS36701_5116e444/pass-20220707T125428Z-001/pass/barcode03/output/reads_bc03_un_mixed.fasta"
+x_covered <- readDNAStringSet(filepath = c(filepath1, filepath2))
+name_c <- "49f23ce2-8000-4c65-8790-91ecc042855f runid=7603663a2adec7cf9ecee66b7cd4a81aa9032d9a sampleid=no_sample read=69258 ch=104 start_time=2022-06-15T21:19:05Z model_version_id=2021-05-17_dna_r9.4.1_minion_768_2f1c8637 barcode=barcode03"
+name_l = "c748e9a4-5166-4a97-9be7-3f9774df17c0 runid=7603663a2adec7cf9ecee66b7cd4a81aa9032d9a read=39099 ch=340 start_time=2022-06-16T00:42:45.655343+03:00 flow_cell_id=FAS36701 protocol_group_id=10KKbtMEFsMMpd110 sample_id=no_sample barcode=barcode03 barcode_alias=barcode03 parent_read_id=c748e9a4-5166-4a97-9be7-3f9774df17c0 basecall_model_version_id=2021-05-17_dna_r9.4.1_minion_384_d37a2ab9"
+x_covered <- x_covered[which(names(x_covered) %in% c(name_c, name_l))] # this is the plot 55 in the mixed_bc03 from Trial10 which Dudy toled me 
+# See this telomere. 130K! but the label is covering the graph !
+x_covered <- reverseComplement(x_covered) # needed since it will be rc again !
+
+setwd("/home/lab/Downloads/Telomers/plot_test")
+
+dir.create("output_plotTest")
+run_with_rc_and_filter(samples = x_covered, patterns = dna_rc_patterns,
+                       output_dir = "output_plotTest",
+                       telorrete_pattern = the_telorete_pattern )
+
+
+# now try diff plots
+
+plot_df <- read_csv(file = "/home/lab/Downloads/Telomers/plot_test/output_plotTest/output_sub20_AdjustTelomerePosition/single_read_plots_adj/read1.csv")
+ggplot(plot_df , aes(x = start_index, y = density)) + geom_area(colour = "red", fill = "red")
+
+
+plot_df100 <- read_csv(file = "/home/lab/Downloads/Telomers/plot_test/output_plotTest/old_output/single_read_plots/read1.csv")
+ggplot(plot_df100 , aes(x = start_index, y = density )) + geom_area(colour = "red", fill = "red") +  
+  scale_x_continuous(name="Position", limits=c(1, 123501), breaks = seq(10000, 123501, by = 10000)) +
+  theme_light() + legend() # how to inser a legend ???????
+
+
+
+
+# try to adjust the telomere start/end indices using the IRanges indices + telorete_startIndex
+df<-data.frame(Serial = integer(), sequence_ID = character(), sequence_length = integer(),  telo_density = double(),
+               Telorette3 = logical(), Telorette3Start_index = integer(), Telorette_seq = character(), Telomere_start = integer(), Telomere_end = integer(), Telomere_length = integer())
+
+
+# add telo density : get_sub_density <- function(sub_irange, ranges){
+LargeDNAStringSet <- DNAStringSet() # For the fasta output of the reads which pass the filter
+current_serial <- serial_start
+
+
+  current_fastq_name <- names(x_covered[1])
+  current_seq <- unlist(x_covered[1])
+  current_seq <- Biostrings::reverseComplement(current_seq)
+  # we skip the adaptor and telorete so we start with base 57
+  
+  
+  # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
+  analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  dna_rc_patterns, MIN_DENSITY = 0.18)
+  
+  #list_CurrentDens_MP <- get_densityIRanges(current_seq, patterns = PATTERNS_LIST) # to remove: last_100_density = double(), total_density = double(),
+  current_telorete <- matchPattern(pattern = the_telorete_pattern, 
+                                   subject = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)), max.mismatch = 11, with.indels = T)
+  
+  
+  # for the telorete : 3 stage: first whith indels, and max.mismatch == 5, ... last with indels , max.mismatch == 14 : use the width (max width ) to select the irange
+  telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
+  
+  
+  
+  
+  irange_telo <- analyze_list[[2]][[2]]
+  s_index <- start(telo_irange) # 100401 
+  iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) # 100 or 20 ( The length of the subseq)
+  if(length(iranges_start) > 0){ s_index <- start(irange_telo[iranges_start[1]])} # fixed to 100439
+  
+  
+  
+  e_index <- end(telo_irange) # 124142
+  iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
+  if(length(iranges_end) >0 ) {e_index <- end(irange_telo[iranges_end[1]])} # fixed to 124060
+  # There is improvment of 118B at Telomere length for this example.
+  
+  # chech the se itself : old_start_end = [ 100401, 124142], new_start_end = [100439, 124060 ]
+  Biostrings::subseq(x = current_seq, start = 100401, width = 100)
+  
+  # IRanges: find IRange which is within other IRange
+  
+  
+  
+  
+  
+  which(start(irange_telo) <= start(telo_irange) + 20 && start(irange_telo) >= start(telo_irange) )
+  
+  
+  if(width(telo_irange) < 100 ) {next} # not considered a Telomere
+  
+  if(length(current_telorete)){ # The telorrete was found
+    telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
+    " check if the telomre starts after the tellorete.. for meanwhile don't do it....
+        # check if the telomre starts after the tellorete
+        if( start(telo_irange) <= end(current_telorete[[1]]) ){ # check if the telorrete is before the start of the Telomere
+          new_start <- end(current_telorete[[1]]) + 1
+          if(end(telo_irange) <= new_start) { # The tellorete was found after the telomere
+            
+            ##################### CHECH IN THE FUTURE ###################
+            if( width(telo_irange) < 200 ) {next}# won't be considered Telomere, COULD BE PROBLEMATIC IF WE HAVE TO SUBSEQUENCES WHICH CAN BE TELOMERES
+            # else we leave it to be before the telorette
+          }
+          else{ # update the start of the Telo after the telorrete 
+            telo_irange <- IRanges(start = new_start, end = end(telo_irange))
+          }
+        }
+        "              # to remove: last_100_density = double(), total_density = double(),
+    df <- df %>% add_row(Serial = current_serial, sequence_ID = current_fastq_name, sequence_length = length(current_seq), telo_density = telo_density,
+                         Telorette3 = TRUE, Telorette3Start_index = start(current_telorete[1]) + length(current_seq) -87,
+                         Telorette_seq = toString(unlist((current_telorete[1]))), Telomere_start = start(telo_irange), Telomere_end = end(telo_irange), Telomere_length = width(telo_irange))  
+  }
+
+
+
+################## End of test new plots 26/07/2022 ################
+
+
+
+
+
+
+
+
 
 #################### Trial 12  20.07.2022 #################
 setwd("/home/lab/Downloads/Telomers/Trial 12/prelog/barcode01")
