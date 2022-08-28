@@ -1,99 +1,3 @@
-################################################################
-#
-# Author: Dan Lichtental
-# Copyright (c) Dan Lichtental, 2022
-# Email:  dan.lichtental@mail.huji.ac.il
-# 
-# Date: 2022-07-05
-#
-# Script Name: Telomere pattern finder
-#
-# Script Description: In this script we search over fastq file sequences for telomeric paterns.
-#
-#
-# Notes:
-#
-#
-
-
-
-
-################################################ TELOMERS patterns analyzer ################################################ 
-
-########## changes for Jan.2022: try to find the teloret + filter from 55:155 ( avoid the adaptor and teloret)
-#Telorette3
-
-# P-5’-TGCTCCGTGCATCTCCAAGGTTCTAACC  # 28 nucs -> use countmatch Pattern with 11 mismatches (60%)
-
-
-
-
-############# WORK FOR 12.01.2022 ##########################3
-#' 1. make the programm more robust, not only for telomeric sequences
-#' 
-#' 
-#' 2. make 2 plots: the second with total length of 100k (chec the max(seq_length on csv files)) : done
-#' 3. for the plots add line for the end of the total read(vertical line).
-#' 4. take the output fasta file and make it rc -> 5-3 order ( I can do it on linux-shell or on R): done using reverseComplement()
-#' 5. adjust the patterns and telorrete to rc (5-3 order): done
-#' 6. change the title to "Telomeric repeat density": done
-#' 7. try to add "\n\n" for the sub-title (we don't want it to be so close to the x-title): does not work
-#' 8. filter out the reads which thier subtelomeric regin is les then 50b: done with 100b
-#' 9. the read after rc (5'-3'): [sub_telo ,   telo_start,    , telo_end,   telorrete,    , adaptor..s]
-#' 9. adjust the patterns of the telomere and telorrete(rc - YYAGGG paterns , now since R->Y): done
-#' 
-#' #' Work for 20.11
-#' 10. make it more efficient with data.table  library(data.table)  and library("parallel")
-#' 11. Make the functions generic and place them in a project( the ones that don't have to be for telomeres)
-#' 12. make the filter function an argument for searchPatten
-#' 13. make parallel: get 1 fastq/a file as an input divide to 12 samples which all have seq which pass the filter and then
-#'     run in parallel with foreach (i=1:12) %dopar%, make sure I give each samples serial accordingly:
-#'     for exm: samp1 is [1:20] so serial[1:20], samp2[21:40] -> serial[21:40]
-#' 14. need to find out how to filter with apply...
-#' 15. Need to make the Telomere start,end , widht(length) more accurate (maybe use subseq of 20B and not include the telorette ...)
-#' 15. chenge the tellorete: fnd only th unvarible bases ( no specific telorrete3)
-#' 16. fix the bug: 
-#' Error during wrapup: unimplemented type (29) in 'eval'
-
-#Error: no more error handlers available (recursive errors?); invoking 'abort' restart
-#Error during wrapup: INTEGER() can only be applied to a 'integer', not a 'unknown type #29'
-#Error: no more error handlers available (recursive errors?); invoking 'abort' restart
-#bc01 <- readDNAStringSet(filepath = "/home/lab/Downloads/Telomers/Trial 8/fastq_pass-20220508T085644Z-001/fastq_pass/barcode01/FAT23158_pass_barcode01_2c5a6cb7_0.fastq.gz", format = "fastq")
-#run_with_rc_and_filter(samples = bc01, patterns = dna_rc_patterns,
-#                       output_dir = "/home/lab/Downloads/Telomers/Trial 8/fastq_pass-20220508T085644Z-001/fastq_pass/barcode01/output",
-#                       telorrete_pattern = the_telorete_pattern)
-
-
-#'
-#'
-#' # plans for future:
-#'  1. use plot_ly for interactive plots
-#'  2. change the table creation by creating first the vectors and once all finish create from them the dt
-#'  3. make adjustment and s..
-#'  4. make searchPattern a parallel with foreach dopar
-#'  5. create an efficient filter for rawData : I need to figure it out how to use vapply with my own function which returns logical  
-#'     I need to extract a character vector of firts/last 100b for each seq in the DNAStringSet and then apply it to the filter which cheks for pattern density. 
-#'  6.
-#'  7. seperate to several files and create a project
-#'  8. the speling of telorette is "telorette" 
-#'  9. need to make the telomere length more accutrate: subtract from it the teloette indices...s
-
-# 1. load fata/q file
-# 2. filter reads according to MIN_LENGHT
-# 3. find the telorette: GCTCCGTGCATCTCCAAGGTTCTAACC  # 28 nucs -> use countmatch Pattern with 11 mismatches
-# 4. filter reads according to pattern density at the first subtelomere
-# 5. summarise resullts and plot the telomeres
-# 7. need to use the "cutter for barcode" and also cut the telorette from the sequence !!!!!( since it can be identified as subtelomeric region ): did it with telorette - need to add barcode option
-# 8. add a sub-telomeric only fasta/fastq file output    
-# 9. try maybe to use library(microseq) for fastq file output / Or ShortRead ( see Datacap intro to Bioconductor in R chapter 4)
-# 10. try using library(microseq) readFastq and use the Quality for more accurate Or use ShortRead ( see intro to Bioconductor in R) .... or the XStringQuality-class {Biostrings} readDNAStringSet(with.qualities = TRUE, ....)
-# 11. need to add option: search for all 6 types of telorette for a higher chance of finding one
-# 12. add another fasta/fastq file -> telomere_trimed for the mapping to the genome 
-# 13. Try QualityScaledDNAStringSet()
-# 14.  # change to -(61+ ( barcode_telorette == 61)) at run_with_rc_and_filer - done !
-# 15. There is a bug if the DNAstringSet is of length == 1
-# 16. I need to adjust the sub-seq length ( 100 if length >= 40,000 , 20)
-
 library(BiocManager)
 library('BSgenome')
 library('stringr')
@@ -102,16 +6,6 @@ library(IRanges)
 library(purrr)
 # library(data.table)
 library("parallel")
-
-#' @title  
-#' @description 
-#' @usage 
-#' @param 
-#' @param 
-#' @return
-#' @examples
-
-
 
 
 split_telo <- function(dna_seq, sub_length = 100){
@@ -412,12 +306,6 @@ filter_first_100 <- function(sequence, patterns, min_density = 0.18, start = 1,e
 
 
 
-
-
-
-
-
-
 ############## Running functions #############################################################  
 
 
@@ -434,11 +322,13 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
   #'@param serial_start: The first id serial number.
   #'@param min_density: The minimal density of the patterns in a sequence to be consider relevant.
   #'@param title: The title for the density plots.
-  #'
+  
+  if(!dir.exists(output_dir)){ # update  did it 
+    dir.create(output_dir)
+  }
+  
   OUTPUT_TELO_CSV <- paste(output_dir, paste(csv_name, 'csv', sep='.'), sep='/')
   OUTPUT_TELO_FASTA <- paste(output_dir, paste("reads", 'fasta', sep='.'), sep='/')
-  
-  
   OUTPUT_JPEGS <- paste(output_dir, 'single_read_plots', sep='/')
   dir.create(OUTPUT_JPEGS)
   OUTPUT_JPEGS.1 <- paste(output_dir, 'single_read_plots_adj', sep='/')
@@ -463,7 +353,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     
     # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
     analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density)
-    telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
+    telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 10, min_density_score = 6 )
     
     
     irange_telo <- analyze_list[[2]][[2]]
@@ -472,13 +362,16 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     # make the strat/end more accurate (usethe IRanges for the patterns)
     iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
     if(length(iranges_start) > 0){ start(telo_irange) <- start(irange_telo[iranges_start[1]])} 
-    
+    # try more accurate: take the max of which and also check new_end >= new_start before updating the IRange object
     e_index <- end(telo_irange) 
     iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-    if(length(iranges_end) >0 ) {end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+    if(length(iranges_end) >0 ) {
+      #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+      new_end <- end(irange_telo[iranges_end[length(iranges_end)]])# take the last pattern in range 
+      if(new_end >= start(telo_irange)){  end(telo_irange) <- new_end} # make sure end >= start     
+    }  
     
-    
-    
+    # Onc ew have the Telomere indices calculate the density of the patterns within it's range.
     telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
     
     df <- df %>%
@@ -504,6 +397,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
   write.csv(x=df, file=OUTPUT_TELO_CSV)
   writeXStringSet(LargeDNAStringSet, OUTPUT_TELO_FASTA)
   message("Done!") #  now what's left is to extract the sequences from fasta to fasta using the read_names list file ( 3 files )
+  
 } # end of the function searchPatterns
 
 
@@ -519,8 +413,6 @@ Find_Telorette <- function(read_subseq, telorette_pattern)
 
 
 
-
-
 searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_length = 1e5, csv_name = "summary",output_dir, serial_start = 1, min_density, telorete_pattern, title = "Telomeric repeat density"){
   #'@title Search given Patterns over a DNA sequences.
   #'
@@ -533,6 +425,13 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
   #'@param telorete_pattern: The patern of the telorete
   #'@param title: The title for the density plots.
   #'
+  
+  
+  if(!dir.exists(output_dir)){ # update  did it 
+    dir.create(output_dir)
+  }
+  
+  
   OUTPUT_TELO_CSV <- paste(output_dir, paste(csv_name, 'csv', sep='.'), sep='/')
   OUTPUT_TELO_FASTA <- paste(output_dir, paste("reads", 'fasta', sep='.'), sep='/')
   OUTPUT_JPEGS <- paste(output_dir, 'single_read_plots', sep='/')
@@ -568,7 +467,7 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
     current_telorete <- Find_Telorette(read_subseq = subseq(current_seq, start =length(current_seq) -86, end = length(current_seq)) , telorette_pattern = telorete_pattern)
     
     
-    telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
+    telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 10, min_density_score = 6)
     
     irange_telo <- analyze_list[[2]][[2]]
     if(width(telo_irange) < 100 ) {next} # not considered a Telomere
@@ -579,8 +478,11 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
     
     e_index <- end(telo_irange) 
     iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-    if(length(iranges_end) >0 ) {end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
-    
+    if(length(iranges_end) >0 ) {
+      #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+      new_end <- end(irange_telo[iranges_end[length(iranges_end)]])# take the last pattern in range 
+      if(new_end >= start(telo_irange)){  end(telo_irange) <- new_end} # make sure end >= start 
+    }
     
     
     
@@ -629,9 +531,11 @@ searchPatterns_withTelorette <- function(sample_telomeres , pattern_list, max_le
   }
   
   # need to save the df in a file
+  
   write.csv(x=df, file=OUTPUT_TELO_CSV)
   writeXStringSet(LargeDNAStringSet, OUTPUT_TELO_FASTA)
   message("Done!") #  now what's left is to extract the sequences from fasta to fasta using the read_names list file ( 3 files )
+  
 } # end of the function searchPatterns  
 
 
@@ -673,8 +577,14 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, telorrete_pat
   #' @param telorrete_pattern: The telorette pattern
   #' @return
   #' @examples
+  
+  
+  if(!dir.exists(output_dir)){ # update  did it 
+    dir.create(output_dir)
+  }
+  
   samps_1000 <- samples[width(samples) >= 1e3]
-  samps_1000 <- reverseComplement(samps_1000)
+  samps_1000 <- Biostrings::reverseComplement(samps_1000)
   copies_of_r <- 10
   
   cl <- makeCluster(copies_of_r)
@@ -694,6 +604,50 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, telorrete_pat
 }
 
 
+# to complete .....
+# need to correct the spelling for telorette
+run_with_rc_and_filter_10threadsSearchPattern <- function(samples,  patterns, output_dir, telorrete_pattern){
+  #' @title: Run a search for Telomeric sequences on the reads   
+  #' @description use rc to adjust for the patterns and barcode/telorette locatio ( should be at the last ~ 60-70 bases), filter out reads with no 
+  #'              no telomeric pattern at the edge and run searchPatterns_withTelorette  
+  #' @usage 
+  #' @param samples: A DNAStringSet of reads
+  #' @param patterns: The patterns for the telomere
+  #' @param output_dir: The path for the output directory
+  #' @param telorrete_pattern: The telorette pattern
+  #' @return
+  #' @examples
+  
+  if(!dir.exists(output_dir)){ # update  did it 
+    dir.create(output_dir)
+  }
+  
+  samps_1000 <- samples[width(samples) >= 1e3]
+  samps_1000 <- Biostrings::reverseComplement(samps_1000)
+  copies_of_r <- 10
+  
+  cl <- makeCluster(copies_of_r)
+  samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  # change to -(61+ just incase there are indels ( barcode_telorette == 61))
+  stopCluster(cl)
+  
+  cl <- makeCluster(copies_of_r)
+  logical_100 <- parSapply(cl, samp_100,  filter_density,patterns = patterns , min_density = 0.175)
+  stopCluster(cl)
+  names(logical_100) <- NULL
+  
+  samps_filtered <- samps_1000[logical_100]
+  
+  # now divide the samps_filtered to 10 sub-sets
+  # crreate the dirs for plots...
+  # use ParApply
+  
+  searchPatterns_withTelorette(samps_filtered, pattern_list = patterns, output_dir = output_dir , min_density = 0.18,
+                               telorete_pattern = telorrete_pattern , serial_start =,  )
+  
+}
+
+
+
 ################## Arguments ######################################################
 
 PATTERNS_LIST <- list("CCCTAA", "CCCTAG", "CCCTGA", "CCCTGG")  # CCCTRR
@@ -704,11 +658,8 @@ PATTERNS_LIST <- append(PATTERNS_LIST, list("AACCCT", "AGCCCT", "GACCCT", "GGCCC
 PATTERNS_LIST <- append(PATTERNS_LIST,list("ACCCTA", "GCCCTA", "ACCCTG", "GCCCTG"))  # add RCCCTR
 
 patterns_dna <- lapply(PATTERNS_LIST, DNAString)
-dna_rc_patterns <- lapply(patterns_dna,reverseComplement)
+dna_rc_patterns <- lapply(patterns_dna, Biostrings::reverseComplement)
 dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 the_telorete_pattern = "TGCTCCGTGCATCTCCAAGGTTCTAACC"
-the_telorete_pattern <- toString(reverseComplement(DNAString(the_telorete_pattern)))
-
-
-
+the_telorete_pattern <- toString(Biostrings::reverseComplement(DNAString(the_telorete_pattern)))
