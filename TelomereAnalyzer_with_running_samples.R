@@ -81,6 +81,48 @@ get_densityIRanges <- function(sequence, patterns){
 }  
 
 
+# with a data frame we can further explore the different patterns
+# my improvment: fiding the IRanges and making union for overlaps and then calculate according to sum(width of the IRanges)
+# The calculation is on the full sequence and it is not fit for subsequences
+get_densityIRanges_with_csv <- function(sequence, patterns, output_path = NA){
+  #' @title Pattern searching function.
+  #' @description: get the density of a given pattern or a total density of a list of patterns, and IRanges of the patterns.
+  #' @param pattern: a list of patterns or a string of 1 pattern.
+  #' @param sequence: DNAString object
+  #' @param output_path: the filename for the csv patterns summary.
+  #' @value A numeric for the total density of the pattern(patterns) in the sequences, a IRanges object of the indcies of the patterns found.
+  #' @return a list of (density, IRanges, data frame) Total density of all the patterns in the list( % of the patterns in this sequence) and the IRanges of them
+  #' @examples 
+  total_density <- 0 
+  patterns_df <- data_frame(patterns = character(), start_idx = integer(), end_idx = integer())
+  mp_all <- IRanges()# union of all the IRanges of all the patterns in the list 
+  if(is.list(patterns))
+  {
+    patterns <- unique(patterns)  # make sure there are no dups
+    for( pat in patterns)
+    {
+      curr_match <- matchPattern(pattern = pat, subject = unlist(sequence), max.mismatch = 0)
+      patterns_df <- add_row(patterns_df, patterns = as.data.frame(curr_match)$x, start_idx = start(curr_match), end_idx = end(curr_match))
+      mp_all <- union.Vector(mp_all, curr_match )
+    }
+  }
+  else
+  {
+    mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence), max.mismatch = 0)
+    patterns_df <- add_row(patterns_df, patterns = as.data.frame(mp_all)$x, start_idx = start(mp_all), end_idx = end(mp_all))
+    mp_all <- union.Vector(mp_all, mp_all) # incase there are overlaps
+  }
+  total_density <-sum(width(mp_all)) / nchar(sequence)
+  pat_list <- list(total_density, mp_all, patterns_df)
+  names(pat_list) <- c("total density", "patterns IRanges", "Patterns data frame")
+  if(!is.na(output_path)) 
+  {
+    write_csv(x = patterns_df, file = output_path)
+  }
+  return(pat_list)
+}  
+
+
 get_sub_density <- function(sub_irange, ranges){
   #' @title Calculate density of a subsequnce.
   #' @details with a given IRanges of a subsequence and IRanges of patterns, compute the density of the IRanges within the 
@@ -554,18 +596,6 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 ####################################################
 
-
-# 12.09.2022 - test plot saved as eps, and another option using ggplot2
-dna_samples <- Biostrings::readDNAStringSet("/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
-
-dna_samples <- dna_samples[c(12,13,37)]
-
-
-searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 140000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
-
-
-
-
 # Running example
 
 
@@ -626,6 +656,30 @@ run_with_rc_and_filter(samples =samples, patterns = PATTERNS_LIST,output_dir = "
 
 
 
+# 12.09.2022 - test plot saved as eps, and another option using ggplot2
+dna_samples <- Biostrings::readDNAStringSet("/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
+
+dna_samples <- dna_samples[c(12,13,37)]
+
+
+searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 140000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
+
+
+# check how many counts for each pattern
+# 1. create a data frame according to pattern list: columns: pattern ,start(IRange), end(IRange)
+sequence <- dna_samples[3]
+pat_1 <- Biostrings::matchPattern(pattern = "TTAGGG", subject = unlist(sequence), max.mismatch = 0)
+pat_2 <- Biostrings::matchPattern(pattern = "CCAGGG", subject = unlist(sequence), max.mismatch = 0)
+
+patterns_df <- data_frame(patterns = character(), start_idx = integer(), end_idx = integer())
+patterns_df <- add_row(patterns_df, patterns = as.data.frame(pat_1)$x, start_idx = start(pat_1), end_idx = end(pat_1))
+
+Biostrings::matchPattern(pattern = "TTAGGG", subject = unlist(dna_samples[3]), max.mismatch = 0)
+
+
+my_list <- get_densityIRanges_with_csv(sequence = dna_samples[3], patterns = dna_rc_patterns)
+
+counts <- my_list$`Patterns data frame` %>% group_by(patterns) %>% count()
 
 
 
@@ -654,86 +708,21 @@ run_with_rc_and_filter(samples =samples, patterns = PATTERNS_LIST,output_dir = "
 
 
 
-plot_single_telo_ggplot <- function(x_length, seq_length, subs, serial_num, seq_start, seq_end,save.it=T, main_title = "",OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
-  #' @title plot the density over a sequence
-  #' @param x_length: The length of the x axis.
-  #' @param seq_length: The length of the sequence
-  #' @param subs: the data frame of subseuences from the analyze_subtelos function
-  #' @param serial_num: The serial number of the current sequence, used as the name of the file
-  #' @param seq_start: The start of the Telomere.
-  #' @param seq_end: The end " ".
-  #' @param sava.it: save the file if TRE
-  #' @param main_title: ad a title.
-  #' @param w: width of the jpeg
-  #' @param h: height of the jpeg
-  #' @param OUTPUT_JPEGS: the output directory for saving the file
-  subs <- na.omit(subs)
-  
-  
-  
-  # save file if specified
-  if(save.it){
-    jpeg_path <- paste(OUTPUT_JPEGS, paste('read', serial_num,'ggplot2', '.jpeg',sep=''), sep='/')  
-    jpeg(filename=jpeg_path, width=w, height=h)                                                            
-  }
-  
-  
-  # 26-07: my addition: save the csv file subs
-  # write_csv(x = subs, file = paste(OUTPUT_JPEGS, paste('read', serial_num, '.csv',sep=''), sep='/') )
-  
-  
-  # give extra x for the legend at the topRigth
-  curr_plot <- ggplot()
-  plot(subs$density ~ subs$start_index, type='n', yaxt='n', xaxt='n',ylab='', xlab='', ylim=c(0,1), xlim=c(1,x_length + round(x_length/4.15)) ) 
-  # create axes
-  xpos <- seq(1, x_length, by=1000) # I have cahnged from 0 to 1
-  axis(1, at=xpos, labels=sprintf("%.1fkb", xpos/1000)); title(xlab = "Position", adj = 0)
-  axis(2, at=seq(-0.1,1,by=0.1), las=2)
-  # add polygon to plot for each variant repeat. 
-  # mychange: only comp_ttaggg 
-  polygon(y=c(0,subs$density,0), x=c(1,subs$start_index,seq_length), col=rgb(1,0,0,0.5), lwd=0.5) # change c(1,) instead of c(0, ) for x
-  
-  rect(xleft = seq_start, ybottom = -0.1, xright = seq_end, ytop = 0, col = "red") # 
-  rect(xleft = seq_end+1, ybottom = -0.1, xright = seq_length, ytop = 0, col = "blue")
-  if(seq_start > 1){
-    rect(xleft = 1, ybottom = -0.1, xright = seq_start, ytop = 0, col = "blue")
-  }
-  
-  abline(h=1, col="black", lty = 2)
-  abline(h=0, col="black", lty = 2)
-  legend(x = x_length, y = 1, legend=c("telomere", "sub-telomere"),col=c("red", "blue"), lty=1, lwd= 2,cex=1.2)
-  sub_title <- paste("read length:", seq_length, ", telomere length:", abs(seq_start-seq_end)+1)
-  title( main = main_title, sub = sub_title, ylab='Density')
-  dev.off()
-  
-}
 
 
 
-density_column <- c(0,0,0,0,0.05, 0.3, 0.8, 0.87,0.9,0.93, 1, 1, 0.9, 0.96,0.89,0.54,0.1,0, 0)
-x_position <- seq(from = 1, to =1789 , by = 99)
-subs <- data_frame(density = density_column, start_index = x_position)
 
-my_ggplot <- ggplot2::ggplot(subs, aes(x = x_position, y = density)) +
-  geom_area(color = NA, fill = "red") +
-  # the 3 last lines are for the telomere-sub-telomre region ....
-  geom_rect(aes(xmin = 1, ymin= -0.01, xmax= 450, ymax = 0), color = "blue", fill = "blue",show.legend = T)  + 
-  geom_rect(aes(xmin = 450, ymin= -0.01, xmax= 1750, ymax = 0), color = "green", fill = "green",show.legend = T)  +
-  geom_rect(aes(xmin = 1750, ymin= -0.01, xmax= 2250, ymax = 0), color = "blue", fill = "blue",show.legend = T)  +
-  labs(title = "Telomeric repeat density", x = "Position", y = "Density") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_hline(yintercept = 1,linetype = "dashed")
-  
-  
-ggsave(plot = my_ggplot, device = "eps", filename = "exmple.eps")  
-  
-  
 
-xpos <- c(1:10)
 
-# declaring the ypos vector 
-# equivalent to x^2
-ypos <- xpos^2
+
+
+
+
+
+
+
+
+
 
 
 
