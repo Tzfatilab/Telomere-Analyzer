@@ -1,2 +1,2 @@
 # Telomere-Analyzer
- Search over fastq file sequences for telomeric patterns.
+ Search over fasta/q file sequences for telomeric patterns.
