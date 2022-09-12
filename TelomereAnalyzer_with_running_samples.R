@@ -260,8 +260,11 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
   subs <- na.omit(subs)
   # save file if specified
   if(save.it){
-    jpeg_path <- paste(OUTPUT_JPEGS, paste('read', serial_num, '.jpeg',sep=''), sep='/')  
-    jpeg(filename=jpeg_path, width=w, height=h)                                                            
+    jpeg_path <- paste(OUTPUT_JPEGS, paste('read', serial_num, '.eps',sep=''), sep='/')  
+    setEPS()
+    # naming the eps file
+    postscript(jpeg_path)
+                                                     
   }
   
   
@@ -295,10 +298,52 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
 }
 
 
-
-
-
-
+plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, seq_end,save.it=T, main_title = "", OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
+  #' @title plot the density over a sequence
+  #' @param seq_length: The length of the sequence
+  #' @param subs: the data frame of subseuences from the analyze_subtelos function
+  #' @param serial_num: The serial number of the current sequence, used as the name of the file
+  #' @param seq_start: The start of the Telomere.
+  #' @param seq_end: The end " ".
+  #' @param sava.it: save the file if TRE
+  #' @param main_title: ad a title.
+  #' @param w: width of the jpeg
+  #' @param h: height of the jpeg
+  #' @param OUTPUT_JPEGS: the output directory for saving the file
+  
+  subs <- na.omit(subs)
+  sub_title <- paste("read length:", seq_length, ", telomere length:", abs(seq_start-seq_end)+1)
+  
+  my_ggplot <- ggplot2::ggplot(subs, aes(x = start_index, y = density)) +
+    geom_area(color = NA, fill = "red") +
+    # the 3 last lines are for the telomere-sub-telomre region ....
+    geom_rect(aes(xmin = seq_start, ymin= -0.01, xmax= seq_end, ymax = 0), color = "green", fill = "green")  +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    geom_hline(yintercept = 1,linetype = "dashed") +
+    labs(title = main_title, x = "Position", y = "Density", subtitle = sub_title)
+  
+  
+  if(seq_end < seq_length)
+  {
+    my_ggplot <- my_ggplot +
+      geom_rect(aes(xmin = seq_end , ymin= -0.01, xmax= seq_length, ymax = 0), color = "blue", fill = "blue")
+  }
+  
+  if(seq_start > 1)
+  {
+    my_ggplot <- my_ggplot +
+      geom_rect(aes(xmin = 1, ymin= -0.01, xmax= seq_start, ymax = 0), color = "blue", fill = "blue")
+    
+  }
+  
+  
+  # save file if specified
+  if(save.it){
+    eps_path <- paste(OUTPUT_JPEGS, paste('gg_read', serial_num, '.eps',sep=''), sep='/')  
+    ggsave(plot = my_ggplot, device = "eps", filename = eps_path)  
+  }
+  
+}
 
 
 
@@ -349,7 +394,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     
     # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
     analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density)
-    telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 10, min_density_score = 6 )
+    telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
     
     
     irange_telo <- analyze_list[[2]][[2]]
@@ -370,6 +415,29 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     # Onc ew have the Telomere indices calculate the density of the patterns within it's range.
     telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
     
+    if(telo_density < 0.5)
+    {
+      telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 10, min_density_score = 6 )
+      irange_telo <- analyze_list[[2]][[2]]
+      if(width(telo_irange) < 100 ) {next} # not considered a Telomere
+      s_index <- start(telo_irange) 
+      # make the strat/end more accurate (usethe IRanges for the patterns)
+      iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
+      if(length(iranges_start) > 0){ start(telo_irange) <- start(irange_telo[iranges_start[1]])} 
+      # try more accurate: take the max of which and also check new_end >= new_start before updating the IRange object
+      e_index <- end(telo_irange) 
+      iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
+      if(length(iranges_end) >0 ) {
+        #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+        new_end <- end(irange_telo[iranges_end[length(iranges_end)]])# take the last pattern in range 
+        if(new_end >= start(telo_irange)){  end(telo_irange) <- new_end} # make sure end >= start     
+      }  
+      
+      # Onc ew have the Telomere indices calculate the density of the patterns within it's range.
+      telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
+    }
+    
+    
     df <- df %>%
       add_row(Serial = current_serial, sequence_ID = current_fastq_name, sequence_length = length(current_seq), 
               telo_density = telo_density, Telomere_start = start(telo_irange), Telomere_end = end(telo_irange), Telomere_length = width(telo_irange))
@@ -382,6 +450,8 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
                      seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=T, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS)
     plot_single_telo(x_length = length(current_seq), seq_length = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
                      seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=T, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS.1)
+    plot_single_telo_ggplot2(seq_length = length(current_seq),subs =  analyze_list[[1]], serial_num = current_serial ,
+                             seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=T, main_title = title,  OUTPUT_JPEGS= OUTPUT_JPEGS )
     
     LargeDNAStringSet <- append(LargeDNAStringSet, values = sample_telomeres[i])
     current_serial <- current_serial + 1
@@ -483,13 +553,13 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 ####################################################
 
 
+# 12.09.2022 - test plot saved as eps, and another option using ggplot2
+dna_samples <- Biostrings::readDNAStringSet("/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
+
+dna_samples <- dna_samples[12:13]
 
 
-
-
-
-
-
+searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 40000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
 
 
 
@@ -543,3 +613,124 @@ run_with_rc_and_filter(samples =samples, patterns = dna_rc_patterns,output_dir =
 
 # since we use the CCCTYY pattern we expect that only the heads will be idntfied as telomeric
 run_with_rc_and_filter(samples =samples, patterns = PATTERNS_LIST,output_dir = "Ref", do_rc = F)
+
+
+# let's test with ggplot2 gemo_area
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+plot_single_telo_ggplot <- function(x_length, seq_length, subs, serial_num, seq_start, seq_end,save.it=T, main_title = "",OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
+  #' @title plot the density over a sequence
+  #' @param x_length: The length of the x axis.
+  #' @param seq_length: The length of the sequence
+  #' @param subs: the data frame of subseuences from the analyze_subtelos function
+  #' @param serial_num: The serial number of the current sequence, used as the name of the file
+  #' @param seq_start: The start of the Telomere.
+  #' @param seq_end: The end " ".
+  #' @param sava.it: save the file if TRE
+  #' @param main_title: ad a title.
+  #' @param w: width of the jpeg
+  #' @param h: height of the jpeg
+  #' @param OUTPUT_JPEGS: the output directory for saving the file
+  subs <- na.omit(subs)
+  # save file if specified
+  if(save.it){
+    jpeg_path <- paste(OUTPUT_JPEGS, paste('read', serial_num,'ggplot2', '.jpeg',sep=''), sep='/')  
+    jpeg(filename=jpeg_path, width=w, height=h)                                                            
+  }
+  
+  
+  # 26-07: my addition: save the csv file subs
+  # write_csv(x = subs, file = paste(OUTPUT_JPEGS, paste('read', serial_num, '.csv',sep=''), sep='/') )
+  
+  
+  # give extra x for the legend at the topRigth
+  curr_plot <- ggplot()
+  plot(subs$density ~ subs$start_index, type='n', yaxt='n', xaxt='n',ylab='', xlab='', ylim=c(0,1), xlim=c(1,x_length + round(x_length/4.15)) ) 
+  # create axes
+  xpos <- seq(1, x_length, by=1000) # I have cahnged from 0 to 1
+  axis(1, at=xpos, labels=sprintf("%.1fkb", xpos/1000)); title(xlab = "Position", adj = 0)
+  axis(2, at=seq(-0.1,1,by=0.1), las=2)
+  # add polygon to plot for each variant repeat. 
+  # mychange: only comp_ttaggg 
+  polygon(y=c(0,subs$density,0), x=c(1,subs$start_index,seq_length), col=rgb(1,0,0,0.5), lwd=0.5) # change c(1,) instead of c(0, ) for x
+  
+  rect(xleft = seq_start, ybottom = -0.1, xright = seq_end, ytop = 0, col = "red") # 
+  rect(xleft = seq_end+1, ybottom = -0.1, xright = seq_length, ytop = 0, col = "blue")
+  if(seq_start > 1){
+    rect(xleft = 1, ybottom = -0.1, xright = seq_start, ytop = 0, col = "blue")
+  }
+  
+  abline(h=1, col="black", lty = 2)
+  abline(h=0, col="black", lty = 2)
+  legend(x = x_length, y = 1, legend=c("telomere", "sub-telomere"),col=c("red", "blue"), lty=1, lwd= 2,cex=1.2)
+  sub_title <- paste("read length:", seq_length, ", telomere length:", abs(seq_start-seq_end)+1)
+  title( main = main_title, sub = sub_title, ylab='Density')
+  dev.off()
+  
+}
+
+
+
+density_column <- c(0,0,0,0,0.05, 0.3, 0.8, 0.87,0.9,0.93, 1, 1, 0.9, 0.96,0.89,0.54,0.1,0, 0)
+x_position <- seq(from = 1, to =1789 , by = 99)
+subs <- data_frame(density = density_column, start_index = x_position)
+
+my_ggplot <- ggplot2::ggplot(subs, aes(x = x_position, y = density)) +
+  geom_area(color = NA, fill = "red") +
+  # the 3 last lines are for the telomere-sub-telomre region ....
+  geom_rect(aes(xmin = 1, ymin= -0.01, xmax= 450, ymax = 0), color = "blue", fill = "blue",show.legend = T)  + 
+  geom_rect(aes(xmin = 450, ymin= -0.01, xmax= 1750, ymax = 0), color = "green", fill = "green",show.legend = T)  +
+  geom_rect(aes(xmin = 1750, ymin= -0.01, xmax= 2250, ymax = 0), color = "blue", fill = "blue",show.legend = T)  +
+  labs(title = "Telomeric repeat density", x = "Position", y = "Density") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 1,linetype = "dashed")
+  
+  
+ggsave(plot = my_ggplot, device = "eps", filename = "exmple.eps")  
+  
+  
+
+xpos <- c(1:10)
+
+# declaring the ypos vector 
+# equivalent to x^2
+ypos <- xpos^2
+
+
+
+
+
