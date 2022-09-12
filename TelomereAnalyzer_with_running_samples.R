@@ -312,6 +312,8 @@ plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, s
   #' @param OUTPUT_JPEGS: the output directory for saving the file
   
   subs <- na.omit(subs)
+  # save the densities in a csv file for later use !
+  write_csv(x = subs, file = paste(OUTPUT_JPEGS, paste( serial_num, '.csv',sep=''), sep='/') )
   sub_title <- paste("read length:", seq_length, ", telomere length:", abs(seq_start-seq_end)+1)
   
   my_ggplot <- ggplot2::ggplot(subs, aes(x = start_index, y = density)) +
@@ -556,10 +558,10 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 # 12.09.2022 - test plot saved as eps, and another option using ggplot2
 dna_samples <- Biostrings::readDNAStringSet("/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
 
-dna_samples <- dna_samples[12:13]
+dna_samples <- dna_samples[c(12,13,37)]
 
 
-searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 40000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
+searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 140000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
 
 
 
@@ -666,6 +668,9 @@ plot_single_telo_ggplot <- function(x_length, seq_length, subs, serial_num, seq_
   #' @param h: height of the jpeg
   #' @param OUTPUT_JPEGS: the output directory for saving the file
   subs <- na.omit(subs)
+  
+  
+  
   # save file if specified
   if(save.it){
     jpeg_path <- paste(OUTPUT_JPEGS, paste('read', serial_num,'ggplot2', '.jpeg',sep=''), sep='/')  
