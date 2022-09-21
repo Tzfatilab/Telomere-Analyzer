@@ -93,23 +93,24 @@ get_densityIRanges_with_csv <- function(sequence, patterns, output_path = NA){
   #' @value A numeric for the total density of the pattern(patterns) in the sequences, a IRanges object of the indcies of the patterns found.
   #' @return a list of (density, IRanges, data frame) Total density of all the patterns in the list( % of the patterns in this sequence) and the IRanges of them
   #' @examples 
+  
   total_density <- 0 
-  patterns_df <- data_frame(patterns = character(), start_idx = integer(), end_idx = integer())
+  patterns_df <- data_frame(start = integer(), end = integer(), width = integer(), seq = character())
   mp_all <- IRanges()# union of all the IRanges of all the patterns in the list 
   if(is.list(patterns))
   {
     patterns <- unique(patterns)  # make sure there are no dups
     for( pat in patterns)
     {
-      curr_match <- matchPattern(pattern = pat, subject = unlist(sequence), max.mismatch = 0)
-      patterns_df <- add_row(patterns_df, patterns = as.data.frame(curr_match)$x, start_idx = start(curr_match), end_idx = end(curr_match))
+      curr_match <- Biostrings::matchPattern(pattern = pat, subject = unlist(sequence), max.mismatch = 0)
+      patterns_df <- dplyr::add_row(patterns_df, as.data.frame(curr_match))
       mp_all <- union.Vector(mp_all, curr_match )
     }
-  }
-  else
+  }else
+    
   {
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence), max.mismatch = 0)
-    patterns_df <- add_row(patterns_df, patterns = as.data.frame(mp_all)$x, start_idx = start(mp_all), end_idx = end(mp_all))
+    patterns_df <- as.data.frame(mp_all)
     mp_all <- union.Vector(mp_all, mp_all) # incase there are overlaps
   }
   total_density <-sum(width(mp_all)) / nchar(sequence)
@@ -120,6 +121,7 @@ get_densityIRanges_with_csv <- function(sequence, patterns, output_path = NA){
     write_csv(x = patterns_df, file = output_path)
   }
   return(pat_list)
+  
 }  
 
 
@@ -142,7 +144,7 @@ get_sub_density <- function(sub_irange, ranges){
 
 
 ###########3 My cahnge from prev - return a list 0f (df, total_density) ###############
-analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY = 0.3){ # return list(subtelos, list_density_mp[1])
+analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY = 0.3, output_path = NA){ # return list(subtelos, list_density_mp[1])
   #' @title Analyze the patterns for each subsequence.
   #' @description s split a dna sequence to subsequences and calculate the density of each subsequence
   #' @param dna_seq: a dna sequence (DNAString object)
@@ -156,7 +158,7 @@ analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY =
   # aother option is to create 5 vector s and then make a data.table from them
   
   # density and iranges of matchPattern
-  list_density_mp <-get_densityIRanges(dna_seq, patterns = patterns)
+  list_density_mp <-get_densityIRanges_with_csv(dna_seq, patterns = patterns, output_path = output_path)
   #density <- list_density_mp[[1]]
   mp_iranges <- list_density_mp[[2]]
   # get start indexes of "subtelo"
@@ -424,7 +426,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
   df<-data.frame(Serial = integer(), sequence_ID = character(), sequence_length = integer(), telo_density = double()
                  , Telomere_start = integer(), Telomere_end = integer(), Telomere_length = integer())
   # add telo density : get_sub_density <- function(sub_irange, ranges){
-  LargeDNAStringSet <- DNAStringSet() # For the fasta output of the reads which pass the filter
+  LargeDNAStringSet <- Biostrings::DNAStringSet() # For the fasta output of the reads which pass the filter
   current_serial <- serial_start
   
   for( i in 1:length(sample_telomeres) ){
@@ -437,7 +439,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     #current_filt_100 <-  get_densityIRanges( subseq(current_seq, start = length(current_seq)-99, end = length(current_seq) ), patterns = pattern_list) 
     
     # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
-    analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density)
+    analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density, output_path = paste0(output_dir, "/", current_serial, ".csv"))
     telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
     
     
@@ -538,7 +540,7 @@ filter_density <- function(sequence, patterns, min_density = 0.18){
 
 
 # need to correct the spelling for telorette
-run_with_rc_and_filter <- function(samples,  patterns, output_dir,  do_rc = TRUE){
+run_with_rc_and_filter <- function(samples,  patterns, output_dir,max_length = 150000,   do_rc = TRUE){
   #' @title: Run a search for Telomeric sequences on the reads   
   #' @description use rc to adjust for the patterns and barcode/telorette locatio ( should be at the last ~ 60-70 bases), filter out reads with no 
   #'              no telomeric pattern at the edge and run searchPatterns_withTelorette  
@@ -555,23 +557,26 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir,  do_rc = TRUE
     dir.create(output_dir)
   }
   
-  samps_1000 <- samples[width(samples) >= 1e3]
-  if(do_rc){samps_1000 <- Biostrings::reverseComplement(samps_1000)}
+  samps_1000 <- samples[Biostrings::width(samples) >= 1e3]
+  if(do_rc)
+  {
+    samps_1000 <- Biostrings::reverseComplement(samps_1000)
+  }
   
   copies_of_r <- 10
   
-  cl <- makeCluster(copies_of_r)
-  samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  # change to -(61+ just incase there are indels ( barcode_telorette == 61))
-  stopCluster(cl)
+  cl <- parallel::makeCluster(copies_of_r)
+  samp_100 <- parallel::parLapply(cl, samps_1000, subseq, end = -67, width = 100)  # change to -(61+ just incase there are indels ( barcode_telorette == 61))
+  parallel::stopCluster(cl)
   
-  cl <- makeCluster(copies_of_r)
-  logical_100 <- parSapply(cl, samp_100,  filter_density,patterns = patterns , min_density = 0.175)
-  stopCluster(cl)
+  cl <- parallel::makeCluster(copies_of_r)
+  logical_100 <- parallel::parSapply(cl, samp_100,  filter_density,patterns = patterns , min_density = 0.175)
+  parallel::stopCluster(cl)
   names(logical_100) <- NULL
   
   samps_filtered <- samps_1000[logical_100]
   
-  searchPatterns(samps_filtered, pattern_list = patterns, max_length = 150000, output_dir = output_dir , min_density = 0.3 )
+  searchPatterns(sample_telomeres = samps_filtered, pattern_list = patterns, max_length = max_length, output_dir = output_dir , min_density = 0.3  )
   
 }
 
@@ -589,7 +594,7 @@ PATTERNS_LIST <- append(PATTERNS_LIST, list("TAACCC", "TAGCCC", "TGACCC", "TGGCC
 PATTERNS_LIST <- append(PATTERNS_LIST, list("AACCCT", "AGCCCT", "GACCCT", "GGCCCT")) # add RRCCCT
 PATTERNS_LIST <- append(PATTERNS_LIST,list("ACCCTA", "GCCCTA", "ACCCTG", "GCCCTG"))  # add RCCCTR
 
-patterns_dna <- lapply(PATTERNS_LIST, DNAString)
+patterns_dna <- lapply(PATTERNS_LIST, Biostrings::DNAString)
 dna_rc_patterns <- lapply(patterns_dna, Biostrings::reverseComplement)
 dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
@@ -597,134 +602,11 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 ####################################################
 
 # Running example
+samples_exmple <- Biostrings::readDNAStringSet(filepath = "/home/lab/Downloads/Telomers/Trial13hNL76telorettes/bonito_output.telomerefixed.fasta.gz")
 
+searchPatterns(sample_telomeres = samples_exmple, pattern_list = patterns_dna, max_length = max(width(samples_exmple)), csv_name = "summary", 
+               output_dir = "Bonito", serial_start = 1, min_density = 0.3 ) 
 
-
-# 31.08.2022
-# comparisson of the reads to the reference ( buth tail and head)
-# take the 30K sub-sequence
-# for head( smooth sub-telomere ): chr 17  and Human read 63
-# for tail (rough sub-telomere ): chr 10 and read 84
-
-reads_t13 <-  readDNAStringSet(filepath = "/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
-# I will cut the 50 last bases of each read ( telorette + barcode)
-# 63,728
-read_84 <- reads_t13[84]
-read_84_trimm_last50 <- Biostrings::subseq(x = read_84, start = 1, end = width(read_84) - 50)
-read_84_30K <- Biostrings::subseq(x = read_84_trimm_last50, end = -1, width = 30000)
-tails_human <- readDNAStringSet(filepath = "/media/lab/E/Human  T2T-CHM13 Reference/TailsAnalysis/reads.fasta")
-tail10 <- tails_human[10] # The telomere length is 3140
-# take 26K last bases
-tail10_26K <- Biostrings::subseq(x = tail10, end = -1, width = 26000)
-
-compare_tails <- append(x = read_84_30K, tail10_26K)
-
-searchPatterns(sample_telomeres = compare_tails, pattern_list = dna_rc_patterns, max_length = 30000, csv_name = "readCompareTail10.csv",output_dir = "comparisson", min_density = 0.3) 
-
-
-
-
-# 77,367, telo length 7181
-# use rc , extract out the telorette , and take the first 30K
-read_63 <- reads_t13[63]
-read_63_trimm_last50 <- Biostrings::subseq(x = read_63, start = 1, end = width(read_63) - 50)
-read_63_trimm_last50_rc <- Biostrings::reverseComplement(read_63_trimm_last50)
-read_63_30K <- Biostrings::subseq(x = read_63_trimm_last50_rc, start = 1,  width = 30000 ) 
-heads_human <- readDNAStringSet(filepath = "/media/lab/E/Human  T2T-CHM13 Reference/HeadsAnalysis/reads.fasta")
-head17 <- heads_human[17] # 1690
-head17_24500 <- Biostrings::subseq(x = head17, start = 1, width = 24500)
-
-compare_heads <- append(x = read_63_30K, head17_24500)
-
-searchPatterns(sample_telomeres = compare_heads, pattern_list = PATTERNS_LIST, max_length = 30000, csv_name = "readComparehead1",output_dir = "comparisson4", min_density = 0.2) 
-
-# a 150K fisrt and 150K last nt of each chromosome
-samples <- Biostrings::readDNAStringSet(filepath = "/media/lab/E/Human  T2T-CHM13 Reference/T2T_CHM13_150KchrHeadTail_Yexcluded.fasta")
-# since we use the RRAGGG pattern we expect that only the tails will be idntfied as telomeric
-run_with_rc_and_filter(samples =samples, patterns = dna_rc_patterns,output_dir = "Ref", do_rc = F)
-
-# since we use the CCCTYY pattern we expect that only the heads will be idntfied as telomeric
-run_with_rc_and_filter(samples =samples, patterns = PATTERNS_LIST,output_dir = "Ref", do_rc = F)
-
-
-# let's test with ggplot2 gemo_area
-
-
-
-
-
-
-
-
-# 12.09.2022 - test plot saved as eps, and another option using ggplot2
-dna_samples <- Biostrings::readDNAStringSet("/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
-
-dna_samples <- dna_samples[c(12,13,37)]
-
-
-searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 140000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
-
-
-# check how many counts for each pattern
-# 1. create a data frame according to pattern list: columns: pattern ,start(IRange), end(IRange)
-sequence <- dna_samples[3]
-pat_1 <- Biostrings::matchPattern(pattern = "TTAGGG", subject = unlist(sequence), max.mismatch = 0)
-pat_2 <- Biostrings::matchPattern(pattern = "CCAGGG", subject = unlist(sequence), max.mismatch = 0)
-
-patterns_df <- data_frame(patterns = character(), start_idx = integer(), end_idx = integer())
-patterns_df <- add_row(patterns_df, patterns = as.data.frame(pat_1)$x, start_idx = start(pat_1), end_idx = end(pat_1))
-
-Biostrings::matchPattern(pattern = "TTAGGG", subject = unlist(dna_samples[3]), max.mismatch = 0)
-
-
-my_list <- get_densityIRanges_with_csv(sequence = dna_samples[3], patterns = dna_rc_patterns)
-
-counts <- my_list$`Patterns data frame` %>% group_by(patterns) %>% count()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# End of running example
+##############################################################################################################################################
 
