@@ -1,2 +1,6 @@
 # Telomere-Analyzer
- Search over fasta/q file sequences for telomeric patterns.
+ Search over DNA sequences for telomeric patterns.
+ 
+ 
+TelomereAnalyzer.R for now is just a draft with a lot of remarks for future planning.
+Use the TelomereAnalyzer_with_running_samples.R to run the program.
