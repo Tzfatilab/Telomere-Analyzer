@@ -604,7 +604,7 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 # Running example
 samples_exmple <- Biostrings::readDNAStringSet(filepath = "/home/lab/Downloads/Telomers/Trial13hNL76telorettes/bonito_output.telomerefixed.fasta.gz")
 
-searchPatterns(sample_telomeres = samples_exmple, pattern_list = patterns_dna, max_length = max(width(samples_exmple)), csv_name = "summary", 
+searchPatterns(sample_telomeres = samples_exmple, pattern_list = PATTERNS_LIST, max_length = max(width(samples_exmple)), csv_name = "summary", 
                output_dir = "Bonito", serial_start = 1, min_density = 0.3 ) 
 
 # End of running example
