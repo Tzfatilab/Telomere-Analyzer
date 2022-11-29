@@ -14,7 +14,9 @@
 # Notes:
 
 
-
+# The 'confilcted' package tries to make your function choice explicit.
+#   it produce an error if a function name is found on 2 or more packages!!!
+library('conflicted')
 
 library(BiocManager)
 library('BSgenome')
@@ -287,7 +289,7 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, min_densi
 # I need to adjust the plot to my code
 # dna.seq is a DNAStringSet of length 1
 # This is version updated at 6.01.2022
-plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, seq_end,save.it=T, main_title = "", w=750, h=300, OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
+plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, seq_end,save.it=TRUE, main_title = "", w=750, h=300, OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
   #' @title plot the density over a sequence
   #' @param x_length: The length of the x axis.
   #' @param seq_length: The length of the sequence
@@ -341,7 +343,7 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
 }
 
 
-plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, seq_end,save.it=T, main_title = "", OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
+plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, seq_end,save.it=TRUE, main_title = "", OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
   #' @title plot the density over a sequence
   #' @param seq_length: The length of the sequence
   #' @param subs: the data frame of subseuences from the analyze_subtelos function
@@ -495,11 +497,11 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     }
     
     plot_single_telo(x_length =max(max_length, length(current_seq)), seq_length = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
-                     seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=T, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS)
+                     seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=TRUE, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS)
     plot_single_telo(x_length = length(current_seq), seq_length = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
-                     seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=T, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS.1)
+                     seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=TRUE, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS.1)
     plot_single_telo_ggplot2(seq_length = length(current_seq),subs =  analyze_list[[1]], serial_num = current_serial ,
-                             seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=T, main_title = title,  OUTPUT_JPEGS= OUTPUT_JPEGS )
+                             seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=TRUE, main_title = title,  OUTPUT_JPEGS= OUTPUT_JPEGS )
     
     LargeDNAStringSet <- append(LargeDNAStringSet, values = sample_telomeres[i])
     current_serial <- current_serial + 1
@@ -508,7 +510,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
   } # end of for loop
   
   # need to save the df in a file
-  write.csv(x=df, file=OUTPUT_TELO_CSV, col.names = F)
+  write.csv(x=df, file=OUTPUT_TELO_CSV, col.names = FALSE)
   writeXStringSet(LargeDNAStringSet, OUTPUT_TELO_FASTA)
   message("Done!") #  now what's left is to extract the sequences from fasta to fasta using the read_names list file ( 3 files )
   
@@ -520,7 +522,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
 
 
 # need to create parApply for filter 
-library("parallel")
+
 filter_density <- function(sequence, patterns, min_density = 0.18){
   #'
   current_seq <- unlist(sequence)
@@ -606,7 +608,7 @@ create_sample <- function(input_path, format = 'fastq')
   #'                gz extension is supported.
   if(dir.exists(input_path))
   {
-    sample <- Biostrings::readDNAStringSet(filepath = dir(full.names = T, path = input_path) , format = format)
+    sample <- Biostrings::readDNAStringSet(filepath = dir(full.names = TRUE, path = input_path) , format = format)
   }else # it is a single file path
   {
     sample <- Biostrings::readDNAStringSet(filepath = input_path, format = format)
@@ -633,6 +635,32 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 ####################################################
 
+#running example:
+some_fatq_path <- 'path/sample.fastq'
+run_with_rc_and_filter(samples = create_sample(some_fatq_path), patterns =  dna_rc_patterns, output_dir = 'OUTPTUT', do_rc = TRUE)
+
+
+
+
+# todo: 
+#' 1. Create a function for running from a filepath - Done: create_sample
+#' 2. Make a package
+#' 3. upload to git
+#' 4. Add a subtelo- only reads (Telomers are trimmed off)
+#' 5. Give trimm barcode option (length of nt to trimm..1300/30)
+#' 6. Divide run_with_rc_and_filter to 2 function: one which do the initial filteration
+#'    and a second one which do all the running.
+#' 7. Create a csv files with a description...  a log file : https://cran.r-project.org/web/packages/logr/vignettes/logr.html  
+#' 8. Use the suppressMessages or suppressPackageStartupMessages(library_wich give as saving 7*7....) : https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=5
+#' 9. Use message() to show to process of work % and how much time it takes ....
+#' 10. Use isTRUE() for logical...
+#' 11. Check the warrnings : see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=10
+
+
+
+
+
+
 # I need to create a log funcion : with ifelse ( if telomeric patterns were found or not -> no one passed the filteration or df isempty ....)
 sample_name <- "test1"
 # test log file
@@ -654,427 +682,9 @@ log_print()
 log_print()
 # Close log
 log_close()
-
+# in the log also show the name of the fastq/a files...
 # View results
 writeLines(readLines(lf))
-
-
-
-
-
-
-
-
-
-
-# todo: 
-#' 1. Create a function for running from a filepath - Done: create_sample
-#' 2. Make a package
-#' 3. upload to git
-#' 4. Add a subtelo- only reads (Telomers are trimmed off)
-#' 5. Give trimm barcode option (length of nt to trimm..1300/30)
-#' 6. Divide run_with_rc_and_filter to 2 function: one which do the initial filteration
-#'    and a second one which do all the running.
-#' 7. Create a csv files with a description...  a log file : https://cran.r-project.org/web/packages/logr/vignettes/logr.html  
-
-# 24.11 - run on Trial15 unclassified
-maindir <- '/home/lab/Downloads/Telomers/Trial15_bc1_2_3_6Telorette3Musmusculus/fastq_pass/rebarcoding_unclassified'
-path_list <-dir(path = maindir)
-path_list <- path_list[1:13]
-path_list <- paste( maindir, path_list,sep = '/')
-# I have a bug in  path_list[[4]]
-for(i in 1:length(path_list))
-{
-  run_with_rc_and_filter(samples = create_sample(input_path = path_list[[i]]), 
-                         patterns = dna_rc_patterns, output_dir = paste(path_list[[i]],'output', sep = '/')
-                         , do_rc = T, serial_start = 1)
-}
-
-sample_bc04 <- create_sample(path_list[[4]])
-sample_bc04 <- create_sample
-
-
-# 24.11.2022 - rerun Trial 17 unclassified: 
-maindir <- '/media/lab/E/Telomeres/Trial 17/Unclassified_rebarcoding-20221123T131555Z-001/Unclassified_rebarcoding/rebarcoding_output_Threshold_45'
-path_list <- dir()
-path_list <-path_list[c(1:12,18)]
-
-path_list <- paste( maindir, path_list,sep = '/')
-
-
-# 24.11 - run Trial 15 unclassified....
-dir(full.names = T, path = path_list[[1]])
-for(i in 7:13)
-{
-  run_with_rc_and_filter(samples = create_sample(input_path = path_list[[i]]), 
-                         patterns = dna_rc_patterns, output_dir = paste(path_list[[i]],'output', sep = '/')
-                         , do_rc = T, serial_start = 1)
-}
-
-# now run threshold 50
-maindir <- '/media/lab/E/Telomeres/Trial 17/Unclassified_rebarcoding-20221123T131555Z-001/Unclassified_rebarcoding/rebarcoding_output_Threshold_50'
-path_list <- dir(path = maindir)
-path_list <-path_list[c(6:11,15)]
-
-path_list <- paste( maindir, path_list,sep = '/')
-
-
-# 24.11 - run Trial 15 unclassified....thteshold 50
-for(i in 1:length(path_list))
-{
-  run_with_rc_and_filter(samples = create_sample(input_path = path_list[[i]]), 
-                         patterns = dna_rc_patterns, output_dir = paste(path_list[[i]],'output', sep = '/')
-                         , do_rc = T, serial_start = 1)
-}
-
-
-
-
-
-
-# 21.11.2022: Explore the T2T reference wrt Telomere start, end indexes
-# upload the minimap2 results to compare
-
-# minimap2 mapping results for trial 17
-
-
-
-
-
-# Heads in T2T
-heads_t2t <- readDNAStringSet(filepath = '/media/lab/E/Human  T2T-CHM13 Reference/HeadsAnalysis/reads.fasta')
-heads_csv <- read_csv(file = '/media/lab/E/Human  T2T-CHM13 Reference/HeadsAnalysis/Heads.csv',show_col_types = F)
-
-manual_corrected_heads_csv <- data.frame(sequence_ID = character(), Telomere_start = integer(), Telomere_end = integer())
-#chr 1: 1,2705
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "1", Telomere_start = 1 , Telomere_end = 2705)
-
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "2", Telomere_start = 1 , Telomere_end = 3617 )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "3", Telomere_start = 1 , Telomere_end = 2640)
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "4", Telomere_start = 1 , Telomere_end = 3271)
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "5", Telomere_start = 1 , Telomere_end = 2296)
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "6", Telomere_start = 1 , Telomere_end = 2899)
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "7", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "8", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "9", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "10", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "11", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "12", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "13", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "14", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "15", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "16", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "17", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "18", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "19", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "20", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "21", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "22", Telomere_start = 1 , Telomere_end = )
-manual_corrected_heads_csv <- add_row(manual_corrected_heads_csv, sequence_ID = "23", Telomere_start = 1 , Telomere_end = )
-
-#chr21 : 1,3015
-
-# now make corrections with mismax+indels patterns both for start and end of the telomere
-telo_irange <- gray_area_adges(telo_irange, current_seq, patterns)
-{
-  start <- start(telo_irange)
-  end <- end(telo_irange)
-}
-
-# search at the right edge
-end1 <- 2700
-m1 <- Biostrings::matchPattern( pattern = "CCCTAA", subject = unlist(subseq(x = heads_t2t[1], start = end1 -5, end= end1 + 5)), max.mismatch = 2 , with.indels = T)
-while(length(m1) > 0 && end1 < ( width(heads_t2t[1]) -50 ) )
-{
-  print(m1)
-  end1 <- end1 + max(end(m1))
-  print(end1)
-  m1 <- Biostrings::matchPattern( pattern = "CCCTAA", subject = unlist(subseq(x = heads_t2t[1], start = end1 +1, end= end1 + 11)), max.mismatch = 2 , with.indels = T)
-}
-
-# search at the left edge
-start1 <- 1101
-
-
-
-
-
-
-# Running example
-# I need to add jpeg file, improve creating csv , and another function which gets the dir of fastq files - and make a package
-# 23.10.2022 - Trial 17
-setwd("/media/lab/E/Telomeres/Trial 17/barcode02")
-bc02_filepath <- dir()
-t17_bc02 <- Biostrings::readDNAStringSet(filepath = bc02_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc02, patterns = dna_rc_patterns, output_dir = "bc02_output", do_rc = T)
-rm(t17_bc02)
-
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode01")
-bc01_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc01_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode11")
-bc011_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc011_filepath, format = "fastq")
-t1 <- Sys.time()
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode07")
-bc07_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc07_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode04")
-bc04_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc04_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode09")
-bc09_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc09_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode10")
-bc010_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc010_filepath , format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-setwd("/media/lab/E/Telomeres/Trial 17/barcode08")
-bc08_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = bc08_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-
-Sys.time() - t1
-
-# unclasiffied including miss classified - לא עבד, כנראה בגלל הזיכרון- כגודל הקבצים יותר מ- 4 גיגה..
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied")
-un_filepath <- dir(pattern =  "*.gz", recursive = T)
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T)
-rm(t17_bc)
-Sys.time() - t1
-
-
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/1")
-un_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start = 1)
-rm(t17_bc)
-Sys.time() - t1
-
-df1 <- read_csv("output/summary.csv")
-# check serial end of prev before running
-# check also the cores
-ncores <- detectCores(logical = F)
-
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/2")
-un_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start = 247)
-rm(t17_bc)
-Sys.time() - t1
-
-df2 <- read_csv("output/summary.csv")
-
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/3")
-un_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start = 510)
-rm(t17_bc)
-Sys.time() - t1
-
-df3 <- read_csv("output/summary.csv")
-max(df3$Serial)
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/4")
-un_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start = 807)
-rm(t17_bc)
-Sys.time() - t1
-
-df4 <- read_csv("output/summary.csv")
-max(df4$Serial)
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/5")
-un_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start= 1094)
-rm(t17_bc)
-Sys.time() - t1
-
-
-df5 <- read_csv("output/summary.csv")
-max(df5$Serial)
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/6")
-un_filepath <- dir()
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start = 1390)
-rm(t17_bc)
-Sys.time() - t1
-
-
-df6 <- read_csv("output/summary.csv")
-max(df6$Serial)
-
-t1 <- Sys.time()
-setwd("/media/lab/E/Telomeres/Trial 17/miss_clasiffied/unclassified/7")
-un_filepath <- dir(pattern =  "*.gz", recursive = T)
-t17_bc <- Biostrings::readDNAStringSet(filepath = un_filepath, format = "fastq")
-run_with_rc_and_filter(samples = t17_bc, patterns = dna_rc_patterns, output_dir = "output", do_rc = T, serial_start = 1736)
-rm(t17_bc)
-Sys.time() - t1
-
-df7 <- read_csv("output/summary.csv")
-max(df7$Serial)
-min(df7$Serial)
-
-
-
-# megre all df's 1:7 ( 1902 reads)
-df_list <- list(df1, df2, df3, df4, df5, df6,df7)
-df_all <- bind_rows(df_list)
-write_csv(x = df_all, 'summary_all.csv')
-
-# merge all reads.fasta (1902 reads)
-reads <- dir(pattern = "*.fasta")
-all_reads <- Biostrings::readDNAStringSet(filepath = reads)
-Biostrings::writeXStringSet(x = all_reads, filepath = 'all_reads.fasta')
-
-
-
-
-# 31.08.2022
-# comparisson of the reads to the reference ( buth tail and head)
-# take the 30K sub-sequence
-# for head( smooth sub-telomere ): chr 17  and Human read 63
-# for tail (rough sub-telomere ): chr 10 and read 84
-
-reads_t13 <-  readDNAStringSet(filepath = "/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
-# I will cut the 50 last bases of each read ( telorette + barcode)
-# 63,728
-read_84 <- reads_t13[84]
-read_84_trimm_last50 <- Biostrings::subseq(x = read_84, start = 1, end = width(read_84) - 50)
-read_84_30K <- Biostrings::subseq(x = read_84_trimm_last50, end = -1, width = 30000)
-tails_human <- readDNAStringSet(filepath = "/media/lab/E/Human  T2T-CHM13 Reference/TailsAnalysis/reads.fasta")
-tail10 <- tails_human[10] # The telomere length is 3140
-# take 26K last bases
-tail10_26K <- Biostrings::subseq(x = tail10, end = -1, width = 26000)
-
-compare_tails <- append(x = read_84_30K, tail10_26K)
-
-searchPatterns(sample_telomeres = compare_tails, pattern_list = dna_rc_patterns, max_length = 30000, csv_name = "readCompareTail10.csv",output_dir = "comparisson", min_density = 0.3) 
-
-
-
-
-# 77,367, telo length 7181
-# use rc , extract out the telorette , and take the first 30K
-read_63 <- reads_t13[63]
-read_63_trimm_last50 <- Biostrings::subseq(x = read_63, start = 1, end = width(read_63) - 50)
-read_63_trimm_last50_rc <- Biostrings::reverseComplement(read_63_trimm_last50)
-read_63_30K <- Biostrings::subseq(x = read_63_trimm_last50_rc, start = 1,  width = 30000 ) 
-heads_human <- readDNAStringSet(filepath = "/media/lab/E/Human  T2T-CHM13 Reference/HeadsAnalysis/reads.fasta")
-head17 <- heads_human[17] # 1690
-head17_24500 <- Biostrings::subseq(x = head17, start = 1, width = 24500)
-
-compare_heads <- append(x = read_63_30K, head17_24500)
-
-searchPatterns(sample_telomeres = compare_heads, pattern_list = PATTERNS_LIST, max_length = 30000, csv_name = "readComparehead1",output_dir = "comparisson4", min_density = 0.2) 
-
-# a 150K fisrt and 150K last nt of each chromosome
-samples <- Biostrings::readDNAStringSet(filepath = "/media/lab/E/Human  T2T-CHM13 Reference/T2T_CHM13_150KchrHeadTail_Yexcluded.fasta")
-# since we use the RRAGGG pattern we expect that only the tails will be idntfied as telomeric
-run_with_rc_and_filter(samples =samples, patterns = dna_rc_patterns,output_dir = "Ref", do_rc = F)
-
-# since we use the CCCTYY pattern we expect that only the heads will be idntfied as telomeric
-run_with_rc_and_filter(samples =samples, patterns = PATTERNS_LIST,output_dir = "Ref", do_rc = F)
-
-
-# let's test with ggplot2 gemo_area
-
-
-
-
-
-
-
-
-# 12.09.2022 - test plot saved as eps, and another option using ggplot2
-dna_samples <- Biostrings::readDNAStringSet("/home/lab/Downloads/Telomers/Trial13hNL76telorettes/output_fastq_pass/reads.fasta")
-
-dna_samples <- dna_samples[c(12,13,37)]
-
-
-searchPatterns(sample_telomeres = dna_samples, pattern_list = dna_rc_patterns, max_length = 140000, output_dir = "/home/lab/test_plots", min_density = 0.3) 
-
-
-# check how many counts for each pattern
-# 1. create a data frame according to pattern list: columns: pattern ,start(IRange), end(IRange)
-sequence <- dna_samples[3]
-pat_1 <- Biostrings::matchPattern(pattern = "TTAGGG", subject = unlist(sequence), max.mismatch = 0)
-pat_2 <- Biostrings::matchPattern(pattern = "CCAGGG", subject = unlist(sequence), max.mismatch = 0)
-
-patterns_df <- data_frame(patterns = character(), start_idx = integer(), end_idx = integer())
-patterns_df <- add_row(patterns_df, patterns = as.data.frame(pat_1)$x, start_idx = start(pat_1), end_idx = end(pat_1))
-
-Biostrings::matchPattern(pattern = "TTAGGG", subject = unlist(dna_samples[3]), max.mismatch = 0)
-
-
-my_list <- get_densityIRanges_with_csv(sequence = dna_samples[3], patterns = dna_rc_patterns)
-
-counts <- my_list$`Patterns data frame` %>% group_by(patterns) %>% count()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
