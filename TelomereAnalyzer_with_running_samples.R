@@ -4,7 +4,7 @@
 # Copyright (c) Dan Lichtental, 2022
 # Email:  dan.lichtental@mail.huji.ac.il
 # 
-# Date: 2022-07-05
+# Last updated:  2022-11-29
 #
 # Script Name: Telomere pattern finder
 #
@@ -14,16 +14,15 @@
 # Notes:
 
 
+
 # The 'confilcted' package tries to make your function choice explicit.
 #   it produce an error if a function name is found on 2 or more packages!!!
 library('conflicted')
-
-library(BiocManager)
-library('BSgenome')
-library('stringr')
+#library(BiocManager)
+#library('BSgenome')
+library('Biostrings')
 library(tidyverse)  
 library(IRanges)
-library(purrr)
 # library(data.table)
 library("parallel")
 library(logr)
@@ -43,7 +42,7 @@ split_telo <- function(dna_seq, sub_length = 100){
   #' @value An IRanges object of the subsequences.
   #' @return iranges_idx: IRanges obsject of the indices of each subsequence
   #' @examples 
-  idx_start <- seq(1,length(dna_seq), by=sub_length)
+  idx_start <- seq(1, length(dna_seq), by=sub_length)
   idx_end <- idx_start + sub_length -1
   idx_end[length(idx_end)] <- length(dna_seq)
   if(length(dna_seq) - last(idx_start) < (sub_length/2)){ # if last subsequence is less then 50% 
@@ -118,7 +117,7 @@ get_densityIRanges <- function(sequence, patterns){
   total_density <-sum(width(mp_all)) / nchar(sequence)
   pat_list <- list(total_density, mp_all, patterns_df)
   names(pat_list) <- c("total density", "patterns IRanges", "Patterns data frame")
-  if(!is.na(output_path)) 
+  if(!isTRUE(is.na(output_path))) 
   {
     write_csv(x = patterns_df, file = output_path)
   }
@@ -143,9 +142,9 @@ get_sub_density <- function(sub_irange, ranges){
   return( sum(width( intersect.Vector(sub_irange, ranges))) / width(sub_irange) ) 
 }
 
-
+# TODO: There is a bug with curid : cur.id <- cur.ID + 1 (Do we need it ?)
 ###########3 My cahnge from prev - return a list 0f (df, total_density) ###############
-analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY = 0.3){ # return list(subtelos, list_density_mp[1])
+analyze_subtelos <- function(dna_seq, patterns, sub_length = 100, MIN_DENSITY = 0.3){ # return list(subtelos, list_density_mp[1])
   #' @title Analyze the patterns for each subsequence.
   #' @description s split a dna sequence to subsequences and calculate the density of each subsequence
   #' @param dna_seq: a dna sequence (DNAString object)
@@ -171,9 +170,10 @@ analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY =
   for(i in 1:length(idx_iranges)){
     #first.idx <- start(idxs_iranges[i])
     #last.idx <- end(idxs_iranges)
-    subtelo.density <-get_sub_density(sub_irange= idx_iranges[i] , ranges = mp_iranges)
+    subtelo.density <-get_sub_density(sub_irange= idx_iranges[i], ranges = mp_iranges)
     #cur.seq <- subseq(dna_seq, start = first.idx, end = last.idx )  #instead_of  substr(dna.seq, first.idx, last.idx)         # sequence of the current subtelomere
     # subtelo.density <- get_density(cur.seq, patterns = patterns)        # calculate all density and classify each subtelo for the patern "CCCTRR"
+    #TODO : rename -5,1,0 to a facators
     CLASSES <- list('CCCTAA'=-5, 'NONE'=1, 'SKIP'=0)
     
     
@@ -189,7 +189,7 @@ analyze_subtelos <- function(dna_seq, patterns , sub_length = 100, MIN_DENSITY =
     }
     #subtelos <- rbindlist(list(subtelos, list(cur.ID, start(idx_iranges[i]) , end(idx_iranges[i]), subtelo.density, subtelo.class)))
     subtelos <- subtelos %>%
-      add_row(ID = cur.ID, start_index =start(idx_iranges[i]) , end_index = end(idx_iranges[i]), density = subtelo.density, class = subtelo.class)
+      add_row(ID = cur.ID, start_index =start(idx_iranges[i]), end_index = end(idx_iranges[i]), density = subtelo.density, class = subtelo.class)
     cur.id <- cur.ID + 1
   }
   return( list(subtelos, list_density_mp) ) # return the subtelos df and the list(total density, mp_iranges)
@@ -244,7 +244,7 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, min_densi
     }
   }
   if(end_position == 0){
-    return(IRanges(1,1)) # no telomere was found 
+    return(IRanges(1, 1)) # no telomere was found 
   }
   
   
@@ -289,7 +289,8 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, min_densi
 # I need to adjust the plot to my code
 # dna.seq is a DNAStringSet of length 1
 # This is version updated at 6.01.2022
-plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, seq_end,save.it=TRUE, main_title = "", w=750, h=300, OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
+# add the posibility for the type of picture file (JPEGS, pdf, eps ....)
+plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, seq_end, save_it=TRUE, main_title = "", w=750, h=300, OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
   #' @title plot the density over a sequence
   #' @param x_length: The length of the x axis.
   #' @param seq_length: The length of the sequence
@@ -304,7 +305,7 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
   #' @param OUTPUT_JPEGS: the output directory for saving the file
   subs <- na.omit(subs)
   # save file if specified
-  if(save.it){
+  if(isTRUE(save_it)){
     eps_path <- paste(OUTPUT_JPEGS, paste('read', serial_num, '.eps',sep=''), sep='/')  
     setEPS()
     # naming the eps file
@@ -325,7 +326,7 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
   axis(2, at=seq(-0.1,1,by=0.1), las=2)
   # add polygon to plot for each variant repeat. 
   # mychange: only comp_ttaggg 
-  polygon(y=c(0,subs$density,0), x=c(1,subs$start_index,seq_length), col=rgb(1,0,0,0.5), lwd=0.5) # change c(1,) instead of c(0, ) for x
+  suppressWarnings(polygon(y=c(0,subs$density,0), x=c(1,subs$start_index,seq_length), col=rgb(1,0,0,0.5), lwd=0.5)) # change c(1,) instead of c(0, ) for x
   
   rect(xleft = seq_start, ybottom = -0.1, xright = seq_end, ytop = 0, col = "red") # 
   rect(xleft = seq_end+1, ybottom = -0.1, xright = seq_length, ytop = 0, col = "blue")
@@ -342,8 +343,9 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
   
 }
 
-
-plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, seq_end,save.it=TRUE, main_title = "", OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
+# add options for the image saved:
+#ggsave currently recognises the extensions eps/ps, tex (pictex), pdf, jpeg, tiff, png, bmp, svg and wmf (windows only).
+plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, seq_end, save_it=TRUE, main_title = "", OUTPUT_JPEGS){ # add OUTPUT_JPEGS as arg
   #' @title plot the density over a sequence
   #' @param seq_length: The length of the sequence
   #' @param subs: the data frame of subseuences from the analyze_subtelos function
@@ -359,14 +361,14 @@ plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, s
   subs <- na.omit(subs)
   # save the densities in a csv file for later use !
   write_csv(x = subs, file = paste(OUTPUT_JPEGS, paste( serial_num, '.csv',sep=''), sep='/') )
-  sub_title <- paste("read length:", seq_length, ", telomere length:", abs(seq_start-seq_end)+1)
+  sub_title <- paste("read length:", seq_length, ", telomere length:", abs(seq_start-seq_end) + 1)
   
   my_ggplot <- ggplot2::ggplot(subs, aes(x = start_index, y = density)) +
     geom_area(color = NA, fill = "red") +
     # the 3 last lines are for the telomere-sub-telomre region ....
-    geom_rect(aes(xmin = seq_start, ymin= -0.01, xmax= seq_end, ymax = 0), color = "green", fill = "green")  +
+    geom_rect(aes(xmin = seq_start, ymin = -0.01, xmax= seq_end, ymax = 0), color = "green", fill = "green")  +
     geom_hline(yintercept = 0, linetype = "dashed") +
-    geom_hline(yintercept = 1,linetype = "dashed") +
+    geom_hline(yintercept = 1, linetype = "dashed") +
     labs(title = main_title, x = "Position", y = "Density", subtitle = sub_title)
   
   
@@ -385,9 +387,10 @@ plot_single_telo_ggplot2 <- function( seq_length, subs, serial_num, seq_start, s
   
   
   # save file if specified
-  if(save.it){
+  if(isTRUE(save_it)){
     eps_path <- paste(OUTPUT_JPEGS, paste('gg_read', serial_num, '.eps',sep=''), sep='/')  
-    ggsave(plot = my_ggplot, device = "eps", filename = eps_path)  
+    #ggsave currently recognises the extensions eps/ps, tex (pictex), pdf, jpeg, tiff, png, bmp, svg and wmf (windows only).
+    suppressMessages(ggsave(plot = my_ggplot, device = "eps", filename = eps_path)) 
   }
   
 }
@@ -441,7 +444,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     #current_filt_100 <-  get_densityIRanges( subseq(current_seq, start = length(current_seq)-99, end = length(current_seq) ), patterns = pattern_list) 
     
     # # returns a a list of (a data frame, list(numeric: total density,iranges)) 
-    analyze_list <- analyze_subtelos(dna_seq = current_seq , patterns =  pattern_list, MIN_DENSITY = min_density)
+    analyze_list <- analyze_subtelos(dna_seq = current_seq, patterns =  pattern_list, MIN_DENSITY = min_density)
     telo_irange <- find_telo_position(seq_length = length(current_seq), subtelos = analyze_list[[1]], min_in_a_row = 3, min_density_score = 2 )
     
     
@@ -497,11 +500,11 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
     }
     
     plot_single_telo(x_length =max(max_length, length(current_seq)), seq_length = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
-                     seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=TRUE, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS)
+                     seq_start = start(telo_irange),seq_end = end(telo_irange), save_it=TRUE, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS)
     plot_single_telo(x_length = length(current_seq), seq_length = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
-                     seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=TRUE, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS.1)
-    plot_single_telo_ggplot2(seq_length = length(current_seq),subs =  analyze_list[[1]], serial_num = current_serial ,
-                             seq_start = start(telo_irange),seq_end = end(telo_irange), save.it=TRUE, main_title = title,  OUTPUT_JPEGS= OUTPUT_JPEGS )
+                     seq_start = start(telo_irange),seq_end = end(telo_irange), save_it=TRUE, main_title = title,  w=750, h=300, OUTPUT_JPEGS= OUTPUT_JPEGS.1)
+    plot_single_telo_ggplot2(seq_length = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
+                             seq_start = start(telo_irange),seq_end = end(telo_irange), save_it=TRUE, main_title = title, OUTPUT_JPEGS= OUTPUT_JPEGS )
     
     LargeDNAStringSet <- append(LargeDNAStringSet, values = sample_telomeres[i])
     current_serial <- current_serial + 1
@@ -510,7 +513,7 @@ searchPatterns <- function(sample_telomeres , pattern_list, max_length = 1e5, cs
   } # end of for loop
   
   # need to save the df in a file
-  write.csv(x=df, file=OUTPUT_TELO_CSV, col.names = FALSE)
+  write.csv(x=df, file=OUTPUT_TELO_CSV, row.names = FALSE)
   writeXStringSet(LargeDNAStringSet, OUTPUT_TELO_FASTA)
   message("Done!") #  now what's left is to extract the sequences from fasta to fasta using the read_names list file ( 3 files )
   
@@ -545,11 +548,12 @@ filter_density <- function(sequence, patterns, min_density = 0.18){
 }
 
 
-# need to correct the spelling for telorette
-run_with_rc_and_filter <- function(samples,  patterns, output_dir,  do_rc = TRUE, serial_start = 1){
+
+run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE, serial_start = 1){
   #' @title: Run a search for Telomeric sequences on the reads   
   #' @description use rc to adjust for the patterns and barcode/telorette locatio ( should be at the last ~ 60-70 bases), filter out reads with no 
-  #'              no telomeric pattern at the edge and run searchPatterns_withTelorette  
+  #'              no telomeric pattern at the edge and run searchPatterns_withTelorette.
+  #'              We assume that the Telomeres are in the right edge, or at the left edge and than we make the reverse comlement.
   #' @usage 
   #' @param samples: A DNAStringSet of reads
   #' @param patterns: The patterns for the telomere
@@ -568,7 +572,7 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir,  do_rc = TRUE
   tmp <- file.path(output_dir, 'run_summary.log')
   
   samps_1000 <- samples[width(samples) >= 1e3]
-  if(do_rc){samps_1000 <- Biostrings::reverseComplement(samps_1000)}
+  if(isTRUE(do_rc)){samps_1000 <- Biostrings::reverseComplement(samps_1000)}
   
   copies_of_r <- 10
   
@@ -579,23 +583,20 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir,  do_rc = TRUE
   cl <- makeCluster(copies_of_r)
   logical_100 <- parSapply(cl, samp_100,  filter_density,patterns = patterns , min_density = 0.175)
   stopCluster(cl)
+  rm(samp_100)
   names(logical_100) <- NULL
   
-  samps_filtered <- samps_1000[logical_100]
+  samps_1000 <- samps_1000[logical_100]
   
-  if(length(samps_filtered) < 1)
+  if(length(samps_1000) < 1)
   {
     message('No read have passed the filteration at run_with_rc_and_filter function!')
   }else
   {
-    searchPatterns(samps_filtered, pattern_list = patterns, max_length = 
-                     max(max(width(samps_filtered)), 150000), output_dir = 
-                     output_dir , min_density = 0.3, serial_start = serial_start )
-
+    searchPatterns(samps_1000, pattern_list = patterns, max_length = 
+                     max(max(width(samps_1000)), 150000), output_dir = 
+                     output_dir, min_density = 0.3, serial_start = serial_start )
   }
-  
-  
-  
 }
 
 
@@ -608,7 +609,7 @@ create_sample <- function(input_path, format = 'fastq')
   #'                gz extension is supported.
   if(dir.exists(input_path))
   {
-    sample <- Biostrings::readDNAStringSet(filepath = dir(full.names = TRUE, path = input_path) , format = format)
+    sample <- Biostrings::readDNAStringSet(filepath = dir(full.names = TRUE, path = input_path), format = format)
   }else # it is a single file path
   {
     sample <- Biostrings::readDNAStringSet(filepath = input_path, format = format)
@@ -641,9 +642,9 @@ run_with_rc_and_filter(samples = create_sample(some_fatq_path), patterns =  dna_
 
 
 
-
+# TODO
 # todo: 
-#' 1. Create a function for running from a filepath - Done: create_sample
+#' 1. Create a function for running from a filepath - Done: create_sample: add to it the option to take only the relevant files within a folder: like fastq.gzip , fastq , fasta ...
 #' 2. Make a package
 #' 3. upload to git
 #' 4. Add a subtelo- only reads (Telomers are trimmed off)
@@ -653,11 +654,22 @@ run_with_rc_and_filter(samples = create_sample(some_fatq_path), patterns =  dna_
 #' 7. Create a csv files with a description...  a log file : https://cran.r-project.org/web/packages/logr/vignettes/logr.html  
 #' 8. Use the suppressMessages or suppressPackageStartupMessages(library_wich give as saving 7*7....) : https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=5
 #' 9. Use message() to show to process of work % and how much time it takes ....
-#' 10. Use isTRUE() for logical...
-#' 11. Check the warrnings : see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=10
+#' 10. Check the warrnings : see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=10
+#' 11. Add error messages using stop for bad arguments... see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=13
+#' 12. Use try for fixing bad arguments such as: 'fasa -> use fasta instead ....
 
 
 
+# test code
+test_samples <- create_sample(input_path = '/media/lab/E/Telomeres/Trial10_2022_06_15_1335_MN34594_FAS36701_5116e444/output_bc01/output_updated/reads.fasta', format = 'fasta')
+
+test2 <- test_samples[1:30]
+run_with_rc_and_filter(samples = test2, patterns = dna_rc_patterns, output_dir = 'test2', do_rc = FALSE)
+
+
+run_with_rc_and_filter(samples = test2, patterns = dna_rc_patterns, output_dir = 'test3', do_rc = FALSE)
+
+# Now create the log function
 
 
 
