@@ -325,7 +325,7 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start,
     if (save_it) {
     jpeg_path <- paste(output_jpegs, paste0("read", serial_num, ".jpeg"), 
                        sep = "/")  
-    jpeg(filename = jpeg_path, width = w, height = h)                                 
+    jpeg(filename = jpeg_path, width = w, height = h)
   }
   
   ## for eps
@@ -411,7 +411,7 @@ plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start,
     labs(title = main_title, x = "Position", y = "Density", 
          subtitle = sub_title)
   
-  if (seq_end < seq_length ) {
+  if (seq_end < seq_length) {
     my_ggplot <- my_ggplot +
       geom_rect(aes(xmin = seq_end, ymin = -0.01, xmax = seq_length, ymax = 0), 
                 color = "blue", fill = "blue")
@@ -473,7 +473,7 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
                  Telomere_length = integer())
   # add telo density : get_sub_density <- function(sub_irange, ranges){
   # For the fasta output of the reads which pass the filter
-  teloomeres_dna_string_set <- DNAStringSet() 
+  telomeres_dna_string_set <- DNAStringSet() 
   current_serial <- serial_start
   
   for (i in seq_along(sample_telomeres)) {
@@ -507,7 +507,7 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
     #' new_start before updating the IRange object
     e_index <- end(telo_irange) 
     iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-    if (length(iranges_end) > 0 ) {
+    if (length(iranges_end) > 0) {
       #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
       # take the last pattern in range 
       new_end <- end(irange_telo[iranges_end[length(iranges_end)]])
@@ -520,31 +520,33 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
     #' within it's range.
     telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
     
-    if(telo_density < 0.75)
-    {
+    if (telo_density < 0.75) {
       telo_irange <- find_telo_position(seq_length = length(current_seq), 
                       subtelos = analyze_list[[1]], min_in_a_row = 10, 
-                      min_density_score = 6 )
+                      min_density_score = 6)
       irange_telo <- analyze_list[[2]][[2]]
-      if(width(telo_irange) < 100 ) {next} # not considered a Telomere
+      if (width(telo_irange) < 100) {
+        next
+      } # not considered a Telomere
       s_index <- start(telo_irange) 
       # make the strat/end more accurate (usethe IRanges for the patterns)
       iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
-      if(length(iranges_start) > 0){
+      if (length(iranges_start) > 0) {
         start(telo_irange) <- start(irange_telo[iranges_start[1]])
       } 
       #' try more accurate: take the max of which and also check new_end >= 
       #' new_start before updating the IRange object
       e_index <- end(telo_irange) 
       iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-      if(length(iranges_end) >0 ) {
+      if (length(iranges_end) > 0) {
         #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
         # take the last pattern in range
         new_end <- end(irange_telo[iranges_end[length(iranges_end)]]) 
         # make sure end >= start 
-        if(new_end >= start(telo_irange)){  end(telo_irange) <- new_end}     
+        if (new_end >= start(telo_irange)) {
+          end(telo_irange) <- new_end
+        }     
       }  
-      
       #' Onc ew have the Telomere indices calculate the density of the patterns 
       #' within it's range.
       telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
@@ -553,78 +555,76 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
     #' now make corrections with mismax+indels patterns both for start and end 
     #' of the telomere
     #telo_irange <- gray_area_adges(telo_irange, current_seq)
-    
     df <- df %>%
       add_row(Serial = current_serial, sequence_ID = current_fastq_name, 
-              sequence_length = length(current_seq), 
-              telo_density = telo_density, Telomere_start = start(telo_irange), 
-              Telomere_end = end(telo_irange), Telomere_length = width(telo_irange))
+              sequence_length = length(current_seq), telo_density = telo_density
+              , Telomere_start = start(telo_irange), Telomere_end = 
+                end(telo_irange), Telomere_length = width(telo_irange))
     
-    if(max_length < length(current_seq)){
+    if (max_length < length(current_seq)) {
       max_length <- current_seq
     }
-    
-    plot_single_telo(x_length =max(max_length, length(current_seq)), seq_length 
-                     = length(current_seq), subs =  analyze_list[[1]], serial_num = current_serial ,
-                     seq_start = start(telo_irange),seq_end = end(telo_irange), 
-                     save_it=TRUE, main_title = title,  w=750, h=300, 
-                     output_jpegs= output_jpegs)
+    plot_single_telo(x_length = max(max_length, length(current_seq)),
+         seq_length = length(current_seq), subs =  analyze_list[[1]], 
+         serial_num = current_serial, seq_start = start(telo_irange), 
+         seq_end = end(telo_irange), save_it = TRUE, main_title = title, 
+         w = 750, h = 300, output_jpegs = output_jpegs)
     
     plot_single_telo(x_length = length(current_seq), seq_length = 
                        length(current_seq), subs =  analyze_list[[1]], 
-                     serial_num = current_serial ,
-                     seq_start = start(telo_irange),seq_end = end(telo_irange), 
-                     save_it=TRUE, main_title = title,  w=750, h=300, 
-                     output_jpegs= output_jpegs_1)
+                     serial_num = current_serial,
+                     seq_start = start(telo_irange), seq_end = end(telo_irange), 
+                     save_it = TRUE, main_title = title,  w = 750, h = 300, 
+                     output_jpegs = output_jpegs_1)
     
     plot_single_telo_ggplot2(seq_length = length(current_seq), subs =  
-                               analyze_list[[1]], serial_num = current_serial ,
-                             seq_start = start(telo_irange),seq_end = 
-                               end(telo_irange), save_it=TRUE, main_title = 
-                               title, output_jpegs= output_jpegs )
+                               analyze_list[[1]], serial_num = current_serial,
+                             seq_start = start(telo_irange), seq_end = 
+                               end(telo_irange), save_it = TRUE, main_title = 
+                               title, output_jpegs = output_jpegs)
     
-    teloomeres_dna_string_set <- append(teloomeres_dna_string_set, values = sample_telomeres[i])
+    telomeres_dna_string_set <- append(telomeres_dna_string_set, 
+                                       values = sample_telomeres[i])
     current_serial <- current_serial + 1
   } # end of for loop
-  
   # need to save the df in a file
-  write.csv(x=df, file=output_telo_csv, row.names = FALSE)
-  writeXStringSet(teloomeres_dna_string_set, output_telo_fasta)
-  message("Done!") #  now what's left is to extract the sequences from fasta to fasta using the read_names list file ( 3 files )
+  write.csv(x = df, file = output_telo_csv, row.names = FALSE)
+  writeXStringSet(telomeres_dna_string_set, output_telo_fasta)
+  message("Done!") 
+  #'  now what's left is to extract the sequences from fasta to fasta using 
+  #'  the read_names list file ( 3 files )
   return(df)
 } # end of the function search_patterns
-
 # need to create parApply for filter 
-filter_density <- function(sequence, patterns, min_density = 0.18){
+filter_density <- function(sequence, patterns, min_density = 0.18) {
   #'
-  current_seq <- unlist(sequence)
   total_density <- 0 
   mp_all <- IRanges()# union of all the IRanges of all the patterns in the list 
-  if(is.list(patterns)){
+  if (is.list(patterns)) {
     patterns <- unique(patterns)  # make sure there are no dups
-    for( pat in patterns){
+    for (pat in patterns){
       mp_all <- union.Vector(mp_all, matchPattern(pattern = pat, subject = 
-                            unlist(sequence), max.mismatch = 0) )
+                            unlist(sequence), max.mismatch = 0))
     }
-  }
-  else{
+  } else {
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence), 
                            max.mismatch = 0)
     mp_all <- union.Vector(mp_all, mp_all) # incase there are overlaps
   }
-  total_density <-sum(width(mp_all)) / nchar(sequence)
   
-  return( total_density >= min_density)
+  total_density <- sum(width(mp_all)) / nchar(sequence)
+  return(total_density >= min_density)
   
 }
 
-
 run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
-                                   serial_start = 1){
+                                   serial_start = 1) {
   #' @title: Run a search for Telomeric sequences on the reads   
-  #' @description use rc to adjust for the patterns and barcode/telorette locatio ( should be at the last ~ 60-70 bases), filter out reads with no 
-  #'              no telomeric pattern at the edge and run search_patterns_withTelorette.
-  #'              We assume that the Telomeres are in the right edge, or at the left edge and than we make the reverse comlement.
+  #' @description use rc to adjust for the patterns and barcode/telorette l
+  #' ocatio ( should be at the last ~ 60-70 bases), filter out reads with no 
+  #'              no telomeric pattern at the edge and run search_patterns.
+  #'              We assume that the Telomeres are in the right edge, or at the 
+  #'              left edge and than we make the reverse comlement.
   #' @usage 
   #' @param samples: A DNAStringSet of reads
   #' @param patterns: The patterns for the telomere
@@ -632,26 +632,28 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
   #' @param telorrete_pattern: The telorette pattern
   #' @return
   #' @examples
-  
-  if(!dir.exists(output_dir)){ # update  did it 
+  #' 
+  #' 
+  #' 
+  if (!dir.exists(output_dir)) { # update  did it 
     dir.create(output_dir)
   }
   
   # create a log file
-  tmp <- file.path(output_dir, 'run_summary.log')
+  #tmp <- file.path(output_dir, "run_summary.log")
   
   samps_1000 <- samples[width(samples) >= 1e3]
-  if(isTRUE(do_rc)){samps_1000 <- Biostrings::reverseComplement(samps_1000)}
-  
-  copies_of_r <- 10
+  if (isTRUE(do_rc)) {
+    samps_1000 <- Biostrings::reverseComplement(samps_1000)
+  }
+    copies_of_r <- 10
   
   cl <- makeCluster(copies_of_r)
   # change to -(61+ just incase there are indels ( barcode_telorette == 61))
   samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  
   stopCluster(cl)
-  
-  cl <- makeCluster(copies_of_r)
-  logical_100 <- parSapply(cl, samp_100,  filter_density,patterns = patterns , 
+    cl <- makeCluster(copies_of_r)
+  logical_100 <- parSapply(cl, samp_100, filter_density, patterns = patterns, 
                            min_density = 0.175)
   stopCluster(cl)
   rm(samp_100)
@@ -659,11 +661,9 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
   
   samps_1000 <- samps_1000[logical_100]
   
-  if(length(samps_1000) < 1)
-  {
-    message('No read have passed the filteration at run_with_rc_and_filter!')
-  }else
-  {
+  if (length(samps_1000) < 1) {
+    message("No read have passed the filteration at run_with_rc_and_filter!")
+  }else {
     search_patterns(samps_1000, pattern_list = patterns, max_length = 
                      max(max(width(samps_1000)), 150000), output_dir = 
                      output_dir, min_density = 0.3, serial_start = serial_start)
@@ -671,8 +671,7 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
 }
 
 
-create_sample <- function(input_path, format = 'fastq')
-{
+create_sample <- function(input_path, format = "fastq") {
   #' @title: Extract DA sampe from fasta/q files.
   #' @description By given input files(fastq otr fasta) creates a DNAStringSet 
   #' object.
@@ -680,12 +679,10 @@ create_sample <- function(input_path, format = 'fastq')
   #' @param format: The file/files format should be either fastq format or fasta 
   #' format gz extension is supported.
   #'                
-  if(dir.exists(input_path))
-  {
+  if (dir.exists(input_path)) {
     sample <- Biostrings::readDNAStringSet(filepath = dir(full.names = TRUE, 
                                             path = input_path), format = format)
-  }else # it is a single file path
-  {
+  }else { # it is a single file path
     sample <- Biostrings::readDNAStringSet(filepath = input_path, 
                                            format = format)
   }
@@ -714,97 +711,4 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 # 05.12.2022
 test4 <- create_sample(input_path = "/home/lab/test3/reads.fasta" , format = "fasta")
-run_with_rc_and_filter(samples = test4 , patterns = dna_rc_patterns , output_dir = "/home/lab/test6" , do_rc = FALSE)
-compare_csv(path1 = "test5/summary.csv", path2 = "test6/summary.csv")
-
-compare_csv <- function(path1, path2) {
-  df1 <- read_csv(path1, show_col_types = FALSE)
-  df2 <- read_csv(path2, show_col_types = FALSE)
-  if( isTRUE(dplyr::all_equal(df1, df2))) {
-    message("The output is the same!")
-  } else {
-    message("The test didn't pass! The output is not the same!")
-  }
-  
-}
-
-
-
-
-
-
-
-
-
-
-# re-run: Trial 17 - bc07 + rebarcoding
-
-t17_bc07 <- create_sample(input_path = '/media/lab/E/Telomeres/Trial 17/Unclassified_rebarcoding-20221123T131555Z-001/Unclassified_rebarcoding/rebarcoding_output_Threshold_50/barcode07/output/merged_with_bc07'
-                          , format = 'fasta')
-search_patterns(sample_telomeres = t17_bc07, pattern_list = dna_rc_patterns,
-               max_length = 100000, csv_name = 'summary-Trial17BC07-rebarcodingThd50included.csv', 
-               output_dir = '/media/lab/E/Telomeres/Trial 17/Unclassified_rebarcoding-20221123T131555Z-001/Unclassified_rebarcoding/rebarcoding_output_Threshold_50/barcode07/output/merged_with_bc07/output', serial_start = 1, min_density =  0.3, title = "Trial 17 - BC07")
-
-
-
-#running example:
-some_fatq_path <- 'path/sample.fastq'
-run_with_rc_and_filter(samples = create_sample(some_fatq_path), patterns =  dna_rc_patterns, output_dir = 'OUTPTUT', do_rc = TRUE)
-
-
-
-# TODO
-# todo: 
-#' 1. Create a function for running from a filepath - Done: create_sample: add to it the option to take only the relevant files within a folder: like fastq.gzip , fastq , fasta ...
-#' 2. Make a package
-#' 3. upload to git
-#' 4. Add a subtelo- only reads (Telomers are trimmed off)
-#' 5. Give trimm barcode option (length of nt to trimm..1300/30)
-#' 6. Divide run_with_rc_and_filter to 2 function: one which do the initial filteration
-#'    and a second one which do all the running.
-#' 7. Create a csv files with a description...  a log file : https://cran.r-project.org/web/packages/logr/vignettes/logr.html  
-#' 8. Use the suppressMessages or suppressPackageStartupMessages(library_wich give as saving 7*7....) : https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=5
-#' 9. Use message() to show to process of work % and how much time it takes ....
-#' 10. Check the warrnings : see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=10
-#' 11. Add error messages using stop for bad arguments... see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=13
-#' 12. Use try for fixing bad arguments such as: 'fasa -> use fasta instead ....
-
-
-
-# test code
-test_samples <- create_sample(input_path = '/media/lab/E/Telomeres/Trial10_2022_06_15_1335_MN34594_FAS36701_5116e444/output_bc01/output_updated/reads.fasta', format = 'fasta')
-
-test2 <- test_samples[1:30]
-run_with_rc_and_filter(samples = test2, patterns = dna_rc_patterns, output_dir = 'test2', do_rc = FALSE)
-
-
-run_with_rc_and_filter(samples = test2, patterns = dna_rc_patterns, output_dir = 'test3', do_rc = FALSE)
-
-# Now create the log function
-
-
-
-# I need to create a log funcion : with ifelse ( if telomeric patterns were found or not -> no one passed the filteration or df isempty ....)
-sample_name <- "test1"
-# test log file
-tmp <- file.path('/media/lab/E/', "test.log")
-
-# Open log
-lf <- log_open(tmp)
-
-# Send message to log
-log_print(paste("Summary statistics of sample", sample_name))
-
-# Perform operations
-df1 <- read_csv('/home/lab/Downloads/Telomers/Trial7B/barcode03/summary.csv', show_col_types = FALSE)
-df1 <- select(df1, -c(1))
-write.csv(x = df1, file = file.path('/media/lab/E/', "df.csv"), row.names = FALSE)
-# Print data to log: length(sample), nrow(df), summary sts of read_leangth, Telo_length
-log_print()
-log_print()
-log_print()
-# Close log
-log_close()
-# in the log also show the name of the fastq/a files...
-# View results
-writeLines(readLines(lf))
+run_with_rc_and_filter(samples = test4 , patterns = dna_rc_patterns , output_dir = "/home/lab/test7" , do_rc = FALSE)
