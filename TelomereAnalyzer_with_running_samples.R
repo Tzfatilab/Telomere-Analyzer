@@ -3,7 +3,7 @@
 # Author: Dan Lichtental
 # Copyright (c) Dan Lichtental, 2022
 # Email:  dan.lichtental@mail.huji.ac.il
-# Last updated:  2022-11-29
+# Last updated:  2022-12-07
 # Script Name: Telomere pattern finder
 # Script Description: In this script we search over fastq file sequences for 
 # telomeric patterns.
@@ -15,9 +15,9 @@ library(conflicted)
 library(Biostrings)
 library(tidyverse)  
 library(IRanges)
-# library(data.table)
 library("parallel")
 library(logr)
+utils::globalVariables(c("start_index"))
 
 split_telo <- function(dna_seq, sub_length = 100) {
   #' @title Splits a DNA sequence nto subsequences. 
@@ -571,11 +571,11 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
          w = 750, h = 300, output_jpegs = output_jpegs)
     
     plot_single_telo(x_length = length(current_seq), seq_length = 
-                       length(current_seq), subs =  analyze_list[[1]], 
-                     serial_num = current_serial,
-                     seq_start = start(telo_irange), seq_end = end(telo_irange), 
-                     save_it = TRUE, main_title = title,  w = 750, h = 300, 
-                     output_jpegs = output_jpegs_1)
+                    length(current_seq), subs =  analyze_list[[1]], 
+                    serial_num = current_serial,
+                    seq_start = start(telo_irange), seq_end = end(telo_irange), 
+                    save_it = TRUE, main_title = title,  w = 750, h = 300, 
+                    output_jpegs = output_jpegs_1)
     
     plot_single_telo_ggplot2(seq_length = length(current_seq), subs =  
                                analyze_list[[1]], serial_num = current_serial,
@@ -595,24 +595,26 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   #'  the read_names list file ( 3 files )
   return(df)
 } # end of the function search_patterns
+
 # need to create parApply for filter 
 filter_density <- function(sequence, patterns, min_density = 0.18) {
   #'
   total_density <- 0 
-  mp_all <- IRanges()# union of all the IRanges of all the patterns in the list 
+  # union of all the IRanges of all the patterns in the list 
+  mp_all <- IRanges::IRanges() 
   if (is.list(patterns)) {
     patterns <- unique(patterns)  # make sure there are no dups
     for (pat in patterns){
-      mp_all <- union.Vector(mp_all, matchPattern(pattern = pat, subject = 
-                            unlist(sequence), max.mismatch = 0))
+      mp_all <- IRanges::union(mp_all, Biostrings::matchPattern(pattern = pat, 
+                subject = unlist(sequence), max.mismatch = 0))
     }
   } else {
-    mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence), 
-                           max.mismatch = 0)
-    mp_all <- union.Vector(mp_all, mp_all) # incase there are overlaps
+    mp_all <- Biostrings::matchPattern(pattern = patterns, 
+              subject = unlist(sequence), max.mismatch = 0)
+    mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
   }
   
-  total_density <- sum(width(mp_all)) / nchar(sequence)
+  total_density <- sum(IRanges::width(mp_all)) / nchar(sequence)
   return(total_density >= min_density)
   
 }
@@ -646,16 +648,17 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
   if (isTRUE(do_rc)) {
     samps_1000 <- Biostrings::reverseComplement(samps_1000)
   }
-    copies_of_r <- 10
+  copies_of_r <- 10
   
   cl <- makeCluster(copies_of_r)
   # change to -(61+ just incase there are indels ( barcode_telorette == 61))
   samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  
   stopCluster(cl)
-    cl <- makeCluster(copies_of_r)
-  logical_100 <- parSapply(cl, samp_100, filter_density, patterns = patterns, 
-                           min_density = 0.175)
-  stopCluster(cl)
+  
+  
+  logical_100 <- mclapply(X = samp_100, FUN = filter_density, 
+                patterns = dna_rc_patterns, min_density = 0.175, mc.cores = 10) 
+  
   rm(samp_100)
   names(logical_100) <- NULL
   
@@ -665,20 +668,18 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
     message("No read have passed the filteration at run_with_rc_and_filter!")
   }else {
     search_patterns(samps_1000, pattern_list = patterns, max_length = 
-                     max(max(width(samps_1000)), 150000), output_dir = 
-                     output_dir, min_density = 0.3, serial_start = serial_start)
+                    max(max(width(samps_1000)), 150000), output_dir = 
+                    output_dir, min_density = 0.3, serial_start = serial_start)
   }
 }
-
 
 create_sample <- function(input_path, format = "fastq") {
   #' @title: Extract DA sampe from fasta/q files.
   #' @description By given input files(fastq otr fasta) creates a DNAStringSet 
   #' object.
   #' @param input_path: path to the file or directory containing files.
-  #' @param format: The file/files format should be either fastq format or fasta 
-  #' format gz extension is supported.
-  #'                
+  #' @param format: The file/files format should be either fastq format or 
+  #'        fasta format gz extension is supported.
   if (dir.exists(input_path)) {
     sample <- Biostrings::readDNAStringSet(filepath = dir(full.names = TRUE, 
                                             path = input_path), format = format)
@@ -709,6 +710,7 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 ####################################################
 
 
-# 05.12.2022
+# running example
 test4 <- create_sample(input_path = "/home/lab/test3/reads.fasta" , format = "fasta")
-run_with_rc_and_filter(samples = test4 , patterns = dna_rc_patterns , output_dir = "/home/lab/test7" , do_rc = FALSE)
+run_with_rc_and_filter(samples = test4 , patterns = dna_rc_patterns , output_dir = "/home/lab/test9" , do_rc = FALSE)
+
