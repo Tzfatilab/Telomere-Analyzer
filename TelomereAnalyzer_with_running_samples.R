@@ -3,7 +3,7 @@
 # Author: Dan Lichtental
 # Copyright (c) Dan Lichtental, 2022
 # Email:  dan.lichtental@mail.huji.ac.il
-# Last updated:  2022-12-07
+# Last updated:  2022-12-08
 # Script Name: Telomere pattern finder
 # Script Description: In this script we search over fastq file sequences for 
 # telomeric patterns.
@@ -462,9 +462,15 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   output_telo_fasta <- paste(output_dir, paste("reads", "fasta", sep = "."), 
                              sep = "/")
   output_jpegs <- paste(output_dir, "single_read_plots", sep = "/")
-  dir.create(output_jpegs)
+  
+  if (!dir.exists(output_jpegs)) {
+    dir.create(output_jpegs)
+  }
   output_jpegs_1 <- paste(output_dir, "single_read_plots_adj", sep = "/")
-  dir.create(output_jpegs_1)
+  if (!dir.exists(output_jpegs_1)) {
+    dir.create(output_jpegs_1)
+  }
+  
   #max_length <- max(width(sample_telomeres))
   #  I HAVE ADDED TLOMERE LENGTH, START @ END
   df <- data.frame(Serial = integer(), sequence_ID = character(), 
@@ -479,12 +485,7 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   for (i in seq_along(sample_telomeres)) {
     current_fastq_name <- names(sample_telomeres[i])
     current_seq <- unlist(sample_telomeres[i])
-    # we skip the adaptor and telorete so we start with base 57
-    
-    ## NEED TO MAKE IT MORE RUBUST , MAYBE ADD THE FILTER FUNCTION AS AN INPUT #
-    #' current_filt_100 <-  get_density_iranges( subseq(current_seq, start = 
-    #' length(current_seq)-99, end = length(current_seq) ), patterns = 
-    #' pattern_list) 
+    #analyze_read(current_seq, pattern_list, min_density,title, output_jpegs, output_jpegs_1, max_length )
     
     # returns a a list of (a data frame, list(numeric: total density,iranges)) 
     analyze_list <- analyze_subtelos(dna_seq = current_seq, patterns =  
@@ -550,7 +551,12 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
       #' Onc ew have the Telomere indices calculate the density of the patterns 
       #' within it's range.
       telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
-    }
+    } else {
+      if (width(telo_irange) < 100) {
+        next
+      }  
+    } # not considered a Telomere
+    
     
     #' now make corrections with mismax+indels patterns both for start and end 
     #' of the telomere
@@ -562,12 +568,12 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
                 end(telo_irange), Telomere_length = width(telo_irange))
     
     if (max_length < length(current_seq)) {
-      max_length <- current_seq
+      max_length <- length(current_seq)
     }
     plot_single_telo(x_length = max(max_length, length(current_seq)),
          seq_length = length(current_seq), subs =  analyze_list[[1]], 
          serial_num = current_serial, seq_start = start(telo_irange), 
-         seq_end = end(telo_irange), save_it = TRUE, main_title = title, 
+         seq_end = end(telo_irange), save_it = TRUE, main_title = title,   
          w = 750, h = 300, output_jpegs = output_jpegs)
     
     plot_single_telo(x_length = length(current_seq), seq_length = 
@@ -582,6 +588,9 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
                              seq_start = start(telo_irange), seq_end = 
                                end(telo_irange), save_it = TRUE, main_title = 
                                title, output_jpegs = output_jpegs)
+    
+    
+    
     
     telomeres_dna_string_set <- append(telomeres_dna_string_set, 
                                        values = sample_telomeres[i])
@@ -619,8 +628,8 @@ filter_density <- function(sequence, patterns, min_density = 0.18) {
   
 }
 
-run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
-                                   serial_start = 1) {
+run_with_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
+                                   serial_start = 1, num_of_cores = 10, csv_name = "summary") {
   #' @title: Run a search for Telomeric sequences on the reads   
   #' @description use rc to adjust for the patterns and barcode/telorette l
   #' ocatio ( should be at the last ~ 60-70 bases), filter out reads with no 
@@ -628,48 +637,22 @@ run_with_rc_and_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
   #'              We assume that the Telomeres are in the right edge, or at the 
   #'              left edge and than we make the reverse comlement.
   #' @usage 
-  #' @param samples: A DNAStringSet of reads
-  #' @param patterns: The patterns for the telomere
-  #' @param output_dir: The path for the output directory
-  #' @param telorrete_pattern: The telorette pattern
-  #' @return
-  #' @examples
-  #' 
-  #' 
-  #' 
+  
   if (!dir.exists(output_dir)) { # update  did it 
     dir.create(output_dir)
   }
   
   # create a log file
-  #tmp <- file.path(output_dir, "run_summary.log")
+  tmp <- file.path(output_dir, "run_summary.log")
   
-  samps_1000 <- samples[width(samples) >= 1e3]
-  if (isTRUE(do_rc)) {
-    samps_1000 <- Biostrings::reverseComplement(samps_1000)
-  }
-  copies_of_r <- 10
+  samples_filtered <- filter_reads(samples = samples, patterns = patterns, do_rc = do_rc, num_of_cores = num_of_cores) 
   
-  cl <- makeCluster(copies_of_r)
-  # change to -(61+ just incase there are indels ( barcode_telorette == 61))
-  samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  
-  stopCluster(cl)
-  
-  
-  logical_100 <- mclapply(X = samp_100, FUN = filter_density, 
-                patterns = dna_rc_patterns, min_density = 0.175, mc.cores = 10) 
-  
-  rm(samp_100)
-  names(logical_100) <- NULL
-  
-  samps_1000 <- samps_1000[logical_100]
-  
-  if (length(samps_1000) < 1) {
-    message("No read have passed the filteration at run_with_rc_and_filter!")
+  if (is.na(samples_filtered[1])) {
+    return (NA)
   }else {
-    search_patterns(samps_1000, pattern_list = patterns, max_length = 
-                    max(max(width(samps_1000)), 150000), output_dir = 
-                    output_dir, min_density = 0.3, serial_start = serial_start)
+    search_patterns(samples_filtered, pattern_list = patterns, max_length = 
+                      max(max(width(samples_filtered)), 150000), output_dir = 
+                      output_dir, min_density = 0.3, serial_start = serial_start, csv_name = csv_name)
   }
 }
 
@@ -690,8 +673,59 @@ create_sample <- function(input_path, format = "fastq") {
   return(sample)
 }
 
+filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10) {
+  samps_1000 <- samples[width(samples) >= 1e3]
+  if (isTRUE(do_rc)) {
+    samps_1000 <- Biostrings::reverseComplement(samps_1000)
+  }
+  
+  cl <- makeCluster(num_of_cores)
+  # change to -(61+ just incase there are indels ( barcode_telorette == 61))
+  samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  
+  stopCluster(cl)
+  
+  
+  logical_100 <- mclapply(X = samp_100, FUN = filter_density, 
+                          patterns = dna_rc_patterns, min_density = 0.175, mc.cores = num_of_cores) 
+  
+  
+  test_filter2 <- samps_1000[unlist(logical_100)]
+  
+  #logical_100 <-sapply(X = samp_100, FUN = filter_density, patterns = dna_rc_patterns, min_density = 0.175)
+  
+  
+  rm(samp_100)
+  names(logical_100) <- NULL
+  
+  samps_1000 <- samps_1000[unlist(logical_100)]
+  
+  if (length(samps_1000) < 1) {
+    message("No read have passed the filteration at run_with_rc_and_filter!")
+    return (NA)
+  }else {
+    
+    return (samps_1000)
+  }
+}
 
 
+run_analyzer <- function(input_path, format = "fastq", patterns, 
+                output_dir, csv_name = "summary", use_filter = TRUE,  do_rc = TRUE, serial_start = 1, 
+                num_of_cores = 10 ) {
+  
+  samples <- create_sample(input_path = input_path, format = format)
+  if (isTRUE(use_filter)) {
+    run_with_filter(samples = samples, patterns = patterns, output_dir = output_dir,
+    do_rc = do_rc, serial_start = serial_start, num_of_cores = num_of_cores, csv_name = csv_name)
+  } else {
+    if (isTRUE(do_rc)) {
+      samples <- Biostrings::reverseComplement(samples)
+    }
+    search_patterns(sample_telomeres = samples, pattern_list = patterns, max_length = max(width(samples)), csv_name = csv_name, min_density = 0.3, serial_start = serial_start )
+  }
+  
+  
+}
 
 ################## Arguments ######################################################
 
@@ -709,8 +743,4 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 ####################################################
 
-
-# running example
-test4 <- create_sample(input_path = "/home/lab/test3/reads.fasta" , format = "fasta")
-run_with_rc_and_filter(samples = test4 , patterns = dna_rc_patterns , output_dir = "/home/lab/test9" , do_rc = FALSE)
 
