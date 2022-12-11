@@ -15,7 +15,7 @@ library(conflicted)
 library(Biostrings)
 library(tidyverse)  
 library(IRanges)
-library("parallel")
+library(parallel)
 library(logr)
 utils::globalVariables(c("start_index"))
 
@@ -305,7 +305,7 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
 # add the posibility for the type of picture file (JPEGS, pdf, eps ....)
 plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start, 
                     seq_end, save_it = TRUE, main_title = "", w = 750, h = 300, 
-                    output_jpegs) { # add output_jpegs as arg
+                    output_jpegs, eps = FALSE) { # add output_jpegs as arg
   #' @title plot the density over a sequence
   #' @param x_length: The length of the x axis.
   #' @param seq_length: The length of the sequence
@@ -323,9 +323,16 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start,
   subs <- na.omit(subs)
   # save file if specified
     if (save_it) {
-    jpeg_path <- paste(output_jpegs, paste0("read", serial_num, ".jpeg"), 
-                       sep = "/")  
-    jpeg(filename = jpeg_path, width = w, height = h)
+      if(isTRUE(eps)) {
+        eps_path <-paste(output_jpegs, paste0('read', serial_num, '.eps'),sep='/')
+        setEPS()
+        #naming the eps file
+        postscript(eps_path)
+      } else {
+        jpeg_path <- paste(output_jpegs, paste0("read", serial_num, ".jpeg"), 
+                           sep = "/")  
+        jpeg(filename = jpeg_path, width = w, height = h)
+      }
   }
   
   ## for eps
@@ -437,6 +444,135 @@ plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start,
   
 }
 
+#' get a single read find and analyze the telomeric patterns in it.
+#' Plot graphs and return a summary row.
+analyze_read <- function(current_seq, current_serial ,pattern_list, min_density, output_jpegs, output_jpegs_1, max_length, title) {
+  current_fastq_name <- names(current_seq)
+  current_seq <- unlist(current_seq)
+  #analyze_read(current_seq, pattern_list, min_density,title, output_jpegs, output_jpegs_1, max_length )
+  
+  # returns a a list of (a data frame, list(numeric: total density,iranges)) 
+  analyze_list <- analyze_subtelos(dna_seq = current_seq, patterns =  
+                                     pattern_list, min_density = min_density)
+  telo_irange <- find_telo_position(seq_length = length(current_seq), 
+                                    subtelos = analyze_list[[1]], 
+                                    min_in_a_row = 3, min_density_score = 2)
+  # TODO: duplicated code: use a helper functio....
+  irange_telo <- analyze_list[[2]][[2]]
+  
+  
+  df <- data.frame(Serial = integer(), sequence_ID = character(), 
+                   sequence_length = integer(), telo_density = double()
+                   , Telomere_start = integer(), Telomere_end = integer(), 
+                   Telomere_length = integer())
+  
+  if (width(telo_irange) < 100) {
+    df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
+                  , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
+                  Telomere_length = NA)
+    return(df)
+  } # not considered a Telomere
+  s_index <- start(telo_irange) 
+  # make the strat/end more accurate (usethe IRanges for the patterns)
+  iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
+  if (length(iranges_start) > 0) { 
+    start(telo_irange) <- start(irange_telo[iranges_start[1]])
+  } 
+  #' try more accurate: take the max of which and also check new_end >= 
+  #' new_start before updating the IRange object
+  e_index <- end(telo_irange) 
+  iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
+  if (length(iranges_end) > 0) {
+    #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+    # take the last pattern in range 
+    new_end <- end(irange_telo[iranges_end[length(iranges_end)]])
+    # make sure end >= start 
+    if (new_end >= start(telo_irange)) {
+      end(telo_irange) <- new_end
+    }     
+  }  
+  #' Onc ew have the Telomere indices calculate the density of the patterns 
+  #' within it's range.
+  telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
+  
+  if (telo_density < 0.75) {
+    telo_irange <- find_telo_position(seq_length = length(current_seq), 
+                                      subtelos = analyze_list[[1]], min_in_a_row = 10, 
+                                      min_density_score = 6)
+    irange_telo <- analyze_list[[2]][[2]]
+    if (width(telo_irange) < 100) {
+      df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
+                    , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
+                    Telomere_length = NA)
+      return(df)
+    } # not considered a Telomere
+    s_index <- start(telo_irange) 
+    # make the strat/end more accurate (usethe IRanges for the patterns)
+    iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
+    if (length(iranges_start) > 0) {
+      start(telo_irange) <- start(irange_telo[iranges_start[1]])
+    } 
+    #' try more accurate: take the max of which and also check new_end >= 
+    #' new_start before updating the IRange object
+    e_index <- end(telo_irange) 
+    iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
+    if (length(iranges_end) > 0) {
+      #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
+      # take the last pattern in range
+      new_end <- end(irange_telo[iranges_end[length(iranges_end)]]) 
+      # make sure end >= start 
+      if (new_end >= start(telo_irange)) {
+        end(telo_irange) <- new_end
+      }     
+    }  
+    #' Onc ew have the Telomere indices calculate the density of the patterns 
+    #' within it's range.
+    telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
+  } else {
+    if (width(telo_irange) < 100) {
+      df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
+                    , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
+                    Telomere_length = NA)
+      return(df)
+    }  
+  } # not considered a Telomere
+  
+  
+  plot_single_telo(x_length = max(max_length, length(current_seq)),
+                   seq_length = length(current_seq), subs =  analyze_list[[1]], 
+                   serial_num = current_serial, seq_start = start(telo_irange), 
+                   seq_end = end(telo_irange), save_it = TRUE, main_title = title,   
+                   w = 750, h = 300, output_jpegs = output_jpegs)
+  
+  plot_single_telo(x_length = length(current_seq), seq_length = 
+                     length(current_seq), subs =  analyze_list[[1]], 
+                   serial_num = current_serial,
+                   seq_start = start(telo_irange), seq_end = end(telo_irange), 
+                   save_it = TRUE, main_title = title,  w = 750, h = 300, 
+                   output_jpegs = output_jpegs_1)
+  
+  # eps
+  plot_single_telo(x_length = length(current_seq), seq_length = 
+                     length(current_seq), subs =  analyze_list[[1]], 
+                   serial_num = current_serial,
+                   seq_start = start(telo_irange), seq_end = end(telo_irange), 
+                   save_it = TRUE, main_title = title,  w = 750, h = 300, 
+                   output_jpegs = output_jpegs_1, eps = TRUE)
+  
+  
+  
+  
+  df <- df %>%
+    add_row(Serial = current_serial, sequence_ID = current_fastq_name, 
+            sequence_length = length(current_seq), telo_density = telo_density
+            , Telomere_start = start(telo_irange), Telomere_end = 
+              end(telo_irange), Telomere_length = width(telo_irange))
+  
+  return(df)
+}
+
+
+
 
 ############## Running functions ###############################################
 
@@ -483,114 +619,22 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   current_serial <- serial_start
   
   for (i in seq_along(sample_telomeres)) {
-    current_fastq_name <- names(sample_telomeres[i])
-    current_seq <- unlist(sample_telomeres[i])
-    #analyze_read(current_seq, pattern_list, min_density,title, output_jpegs, output_jpegs_1, max_length )
-    
-    # returns a a list of (a data frame, list(numeric: total density,iranges)) 
-    analyze_list <- analyze_subtelos(dna_seq = current_seq, patterns =  
-                                       pattern_list, min_density = min_density)
-    telo_irange <- find_telo_position(seq_length = length(current_seq), 
-                                      subtelos = analyze_list[[1]], 
-                                      min_in_a_row = 3, min_density_score = 2)
-    # TODO: duplicated code: use a helper functio....
-    irange_telo <- analyze_list[[2]][[2]]
-    if (width(telo_irange) < 100) {
-      next
-    } # not considered a Telomere
-    s_index <- start(telo_irange) 
-    # make the strat/end more accurate (usethe IRanges for the patterns)
-    iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
-    if (length(iranges_start) > 0) { 
-      start(telo_irange) <- start(irange_telo[iranges_start[1]])
-    } 
-    #' try more accurate: take the max of which and also check new_end >= 
-    #' new_start before updating the IRange object
-    e_index <- end(telo_irange) 
-    iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-    if (length(iranges_end) > 0) {
-      #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
-      # take the last pattern in range 
-      new_end <- end(irange_telo[iranges_end[length(iranges_end)]])
-      # make sure end >= start 
-      if (new_end >= start(telo_irange)) {
-        end(telo_irange) <- new_end
-      }     
-    }  
-    #' Onc ew have the Telomere indices calculate the density of the patterns 
-    #' within it's range.
-    telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
-    
-    if (telo_density < 0.75) {
-      telo_irange <- find_telo_position(seq_length = length(current_seq), 
-                      subtelos = analyze_list[[1]], min_in_a_row = 10, 
-                      min_density_score = 6)
-      irange_telo <- analyze_list[[2]][[2]]
-      if (width(telo_irange) < 100) {
-        next
-      } # not considered a Telomere
-      s_index <- start(telo_irange) 
-      # make the strat/end more accurate (usethe IRanges for the patterns)
-      iranges_start <- which(start(irange_telo) %in% s_index:(s_index + 100)) 
-      if (length(iranges_start) > 0) {
-        start(telo_irange) <- start(irange_telo[iranges_start[1]])
-      } 
-      #' try more accurate: take the max of which and also check new_end >= 
-      #' new_start before updating the IRange object
-      e_index <- end(telo_irange) 
-      iranges_end <- which(end(irange_telo) %in% (e_index - 100):e_index)
-      if (length(iranges_end) > 0) {
-        #end(telo_irange) <- end(irange_telo[iranges_end[1]])} 
-        # take the last pattern in range
-        new_end <- end(irange_telo[iranges_end[length(iranges_end)]]) 
-        # make sure end >= start 
-        if (new_end >= start(telo_irange)) {
-          end(telo_irange) <- new_end
-        }     
-      }  
-      #' Onc ew have the Telomere indices calculate the density of the patterns 
-      #' within it's range.
-      telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
-    } else {
-      if (width(telo_irange) < 100) {
-        next
-      }  
-    } # not considered a Telomere
     
     
     #' now make corrections with mismax+indels patterns both for start and end 
     #' of the telomere
     #telo_irange <- gray_area_adges(telo_irange, current_seq)
-    df <- df %>%
-      add_row(Serial = current_serial, sequence_ID = current_fastq_name, 
-              sequence_length = length(current_seq), telo_density = telo_density
-              , Telomere_start = start(telo_irange), Telomere_end = 
-                end(telo_irange), Telomere_length = width(telo_irange))
-    
-    if (max_length < length(current_seq)) {
-      max_length <- length(current_seq)
+    curr_df <- analyze_read(current_seq = sample_telomeres[i], current_serial =
+               current_serial, pattern_list = pattern_list, min_density = 
+               min_density, output_jpegs = output_jpegs, 
+               output_jpegs_1 = output_jpegs_1, max_length = max_length, title = title)
+    # not a telomeric read
+    if (is.na(curr_df[1,1])) {
+      next
+  
+    } else {
+      df <- dplyr::rows_append(df, curr_df)
     }
-    plot_single_telo(x_length = max(max_length, length(current_seq)),
-         seq_length = length(current_seq), subs =  analyze_list[[1]], 
-         serial_num = current_serial, seq_start = start(telo_irange), 
-         seq_end = end(telo_irange), save_it = TRUE, main_title = title,   
-         w = 750, h = 300, output_jpegs = output_jpegs)
-    
-    plot_single_telo(x_length = length(current_seq), seq_length = 
-                    length(current_seq), subs =  analyze_list[[1]], 
-                    serial_num = current_serial,
-                    seq_start = start(telo_irange), seq_end = end(telo_irange), 
-                    save_it = TRUE, main_title = title,  w = 750, h = 300, 
-                    output_jpegs = output_jpegs_1)
-    
-    plot_single_telo_ggplot2(seq_length = length(current_seq), subs =  
-                               analyze_list[[1]], serial_num = current_serial,
-                             seq_start = start(telo_irange), seq_end = 
-                               end(telo_irange), save_it = TRUE, main_title = 
-                               title, output_jpegs = output_jpegs)
-    
-    
-    
     
     telomeres_dna_string_set <- append(telomeres_dna_string_set, 
                                        values = sample_telomeres[i])
@@ -604,6 +648,14 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   #'  the read_names list file ( 3 files )
   return(df)
 } # end of the function search_patterns
+
+library(foreach)
+library(doParallel)
+
+
+
+
+
 
 # need to create parApply for filter 
 filter_density <- function(sequence, patterns, min_density = 0.18) {
@@ -742,5 +794,27 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 
 ####################################################
+# TODO
+# todo: 
+#' 2. Make a package
+#' 3. upload to git
+#' 4. Add a subtelo- only reads (Telomers are trimmed off)
+#' 5. Give trimm barcode option (length of nt to trimm..1300/30)
+#' 7. Create  a log file : https://cran.r-project.org/web/packages/logr/vignettes/logr.html  
+#' 8. Use the suppressMessages or suppressPackageStartupMessages(library_wich give as saving 7*7....) : https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=5
+#' 9. Use message() to show to process of work % and how much time it takes ....
+#' 10. Check the warrnings : see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=10
+#' 11. Add error messages using stop for bad arguments... see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=13
+#' 12. Use try for fixing bad arguments such as: 'fasa -> use fasta instead ....
+#' 13. Make parallel option for searh_patterns
+#' 14. some reads (about 1 %) do,'t pass the filteration but are found to be telomeric with search_patterns: as the telomere start after more than 160 first bases
+#' 15. Add interactive plotly plot with telomeric density and sequence letters on buttom + ability to zoom in/out ....
+#' 16. Add the matchPatterns with indels and max.mis == 2 at the edges -> plot at the graph as yellow for pattern with error....
+#' 17. Swith instersect.Vector/union.Vector to IRange intersect ....
+
+
+# 08.12.2022 - mice18 preliminary
+df3_bc08 <- run_analyzer(input_path = "/home/lab/Downloads/mouse 18 - preliminary results-20221208T080230Z-001/mouse 18 - preliminary results/barcode01", 
+                         format = "fastq", patterns = dna_rc_patterns, output_dir = "/home/lab/Downloads/mouse 18 - preliminary results-20221208T080230Z-001/mouse 18 - preliminary results/barcode08/output3", csv_name = "summary_bc08_Trial18", use_filter = TRUE, do_rc = TRUE,serial_start = 1, num_of_cores = 10)
 
 
