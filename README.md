@@ -11,6 +11,9 @@ arg[1] : input of fastq/fasta file/dir
 arg[2]: The output directory
 arg[3]: The format of the files: fastq (default) or fasta
 
+The nanotel-multicore-10workers is the same script as nanotel except that it run in parallel using future::plan(multicore, workers = 10).
+The nanotel-multicore-10workers is not supported on Windows OS.
+
 Before running the nanotel: check the default args of the functions: you may want tochange some arguments such as the pattern, min_density ect...
 
 To run it: use the commane:
