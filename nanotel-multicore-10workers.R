@@ -9,7 +9,11 @@ args = commandArgs(trailingOnly=TRUE) # args for input_path, format(fastq/a) and
 # Script Name: Telomere pattern finder
 # Script Description: In this script we search over fastq file sequences for 
 # telomeric patterns.
-# Notes:
+#
+# Notes: Running the script on linux: 
+# "Rscript --vanilla nanotel-multicore-10workers.R input_dir output_dir format"
+# format can be either fasta or fastq, input_dir can be either a full path for a
+# single fastq/a file or a directory containing fastq/a files.
 
 # The 'confilcted' package tries to make your function choice explicit.
 #   it produce an error if a function name is found on 2 or more packages!!!
@@ -841,18 +845,18 @@ plan(multicore, workers = 10)
 groups_length <- 10
 seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
 groups <- 1:groups_length
-split_seq <- split(x = seq_over_length, f = groups)
+split_seq <- suppressWarnings(split(x = seq_over_length, f = groups))
 
 df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = 1 )
 df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`1`) + 1 )
-df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`2`) + 1)
-df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`3`) + 1)
-df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`4`) + 1)
-df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`5`) + 1)
-df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`6`) + 1)
-df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`7`) + 1)
-df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`8`) + 1)
-df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`9`) + 1)
+df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:2])) + 1)
+df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:3])) + 1)
+df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:4])) + 1)
+df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:5])) + 1)
+df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:6])) + 1)
+df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:7])) + 1)
+df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:8])) + 1)
+df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:9])) + 1)
 
 df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9, df10))
 # end of parallel try
@@ -877,7 +881,7 @@ write_csv(x = df_summary, file = file.path(args[2],"summary.csv"))
 t2 <- Sys.time()
 
 
-log_print(base::paste("Work ended at:", toString(t2))) 
+log_print(base::paste("Work ended at:", toString(t2)), hide_notes = TRUE) 
 # Close log
 log_close()
 writeLines(readLines(lf))
