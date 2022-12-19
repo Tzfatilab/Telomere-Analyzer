@@ -818,15 +818,15 @@ log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE) # Se
 log_print("The input files:", hide_notes = TRUE)
 # add the names of the files which we analyze.
 
-if(file.exists(args[1])) {
-  log_print(args[1], hide_notes = TRUE)
-} else {
+if(dir.exists(args[1])) {
   filepath = dir(full.names = TRUE, 
                  path = args[1])
   
   for(i in seq_along(filepath)) {
     log_print(filepath[i], hide_notes = TRUE)
   }
+} else {
+  log_print(args[1], hide_notes = TRUE)
 }
 
 
@@ -852,7 +852,7 @@ create_dirs(output_dir = args[2])
 
 # now try to use future::plan(ulticore, workers = 10) , I need to set the save_summary to false, and after reduce save it.
 # also save the reads as 1 read (serian.fasta : 1.fasta ...) per file instead of reads.fasta.
-
+options(future.globals.maxSize = 1048576000)
 plan(multicore, workers = 10)
 
 # create indices for each worker using split 
