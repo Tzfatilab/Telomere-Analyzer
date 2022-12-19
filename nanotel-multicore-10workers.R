@@ -808,13 +808,24 @@ if (length(args) < 2) {
 # log function blueprint : summary(sample), %telomeric_reads , summary(telo_read) ...
 # I need to create a log funcion : with ifelse ( if telomeric patterns were found or not -> no one passed the filteration or df isempty ....)
 # test log file
-tmp <- file.path(args[2], "test.log")
+tmp <- file.path(args[2], "run.log")
 
 # Open log
 lf <- log_open(tmp)
 
 t1 <- Sys.time()
 log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE) # Send message to log
+
+log_print("The input files:", hide_notes = TRUE)
+# add the names of the files which we analyze.
+filepath = dir(full.names = TRUE, 
+               path = args[1])
+
+for(i in seq_along(filepath)) {
+  log_print(filepath[i], hide_notes = TRUE)
+}
+
+
 dna_reads <- create_sample(input_path = args[1], format = args[3])
 dna_reads <- Biostrings::reverseComplement(dna_reads)
 
