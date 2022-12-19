@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
-args = commandArgs(trailingOnly=TRUE) # args for input_path, format(fastq/a) and output_path
+# args for input_path, format(fastq/a) and output_path
+args <- commandArgs(trailingOnly = TRUE) 
 ################################################################
-#
 # Author: Dan Lichtental
 # Copyright (c) Dan Lichtental, 2022
 # Email:  dan.lichtental@mail.huji.ac.il
@@ -77,13 +77,13 @@ get_density_iranges <- function(sequence, patterns) {
   if (is.list(patterns)) {
     patterns <- unique(patterns)  # make sure there are no dups
     for (pat in patterns){
-      mp_all <- union.Vector(mp_all, matchPattern(pattern = pat, subject = 
+      mp_all <- IRanges::union(mp_all, matchPattern(pattern = pat, subject = 
                        unlist(sequence), max.mismatch = 0))
     }
   }else {
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence), 
                            max.mismatch = 0)
-    mp_all <- union.Vector(mp_all, mp_all) # incase there are overlaps
+    mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
   }
   total_density <- sum(width(mp_all)) / nchar(sequence)
   return(list(total_density, mp_all))
@@ -118,14 +118,14 @@ get_density_iranges_with_csv <- function(sequence, patterns, output_path = NA) {
                                  max.mismatch = 0)
       patterns_df <- add_row(patterns_df, patterns = as.data.frame(curr_match)$x
                      , start_idx = start(curr_match), end_idx = end(curr_match))
-      mp_all <- union.Vector(mp_all, curr_match)
+      mp_all <- IRanges::union(mp_all, curr_match)
     }
   }else {
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence),
                            max.mismatch = 0)
     patterns_df <- add_row(patterns_df, patterns = as.data.frame(mp_all)$x, 
                            start_idx = start(mp_all), end_idx = end(mp_all))
-    mp_all <- union.Vector(mp_all, mp_all) # incase there are overlaps
+    mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
   }
   total_density <- sum(width(mp_all)) / nchar(sequence)
   pat_list <- list(total_density, mp_all, patterns_df)
@@ -156,7 +156,7 @@ get_sub_density <- function(sub_irange, ranges) {
   #'           get_sub_density(sub_irange =  sub_irange, ranges = ranges) # 0.38
   #' this compute the desity of iranges of patterns within a given irange of a 
   #' subsequence
-  return(sum(width(intersect.Vector(sub_irange, ranges))) / width(sub_irange)) 
+  return(sum(width(IRanges::intersect(sub_irange, ranges))) / width(sub_irange)) 
 }
 
 
@@ -330,8 +330,8 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start,
   subs <- na.omit(subs)
   # save file if specified
     if (save_it) {
-      if(isTRUE(eps)) {
-        eps_path <- file.path(output_jpegs, paste0('read', serial_num, '.eps'))
+      if (isTRUE(eps)) {
+        eps_path <- file.path(output_jpegs, paste0("read", serial_num, ".eps"))
         setEPS()
         #naming the eps file
         postscript(eps_path)
@@ -445,12 +445,12 @@ plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start,
     suppressMessages(ggsave(plot = my_ggplot, device = "eps", 
                             filename = eps_path)) 
   }
-  
 }
 
 #' get a single read find and analyze the telomeric patterns in it.
 #' Plot graphs and return a summary row.
-analyze_read <- function(current_seq, current_serial ,pattern_list, min_density, output_dir, output_jpegs, output_jpegs_1, max_length, title) {
+analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
+                         output_dir, output_jpegs, output_jpegs_1, max_length, title) {
   current_fastq_name <- names(current_seq)
   current_seq_unlist <- unlist(current_seq)
   #analyze_read(current_seq, pattern_list, min_density,title, output_jpegs, output_jpegs_1, max_length )
@@ -501,13 +501,13 @@ analyze_read <- function(current_seq, current_serial ,pattern_list, min_density,
   
   if (telo_density < 0.75) {
     telo_irange <- find_telo_position(seq_length = length(current_seq_unlist), 
-                                      subtelos = analyze_list[[1]], min_in_a_row = 10, 
-                                      min_density_score = 6)
+                   subtelos = analyze_list[[1]], min_in_a_row = 10, 
+                   min_density_score = 6)
     irange_telo <- analyze_list[[2]][[2]]
     if (width(telo_irange) < 100) {
       df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
-                    , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
-                    Telomere_length = NA)
+                  , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
+                  Telomere_length = NA)
       return(df)
     } # not considered a Telomere
     s_index <- start(telo_irange) 
@@ -535,20 +535,21 @@ analyze_read <- function(current_seq, current_serial ,pattern_list, min_density,
   } else {
     if (width(telo_irange) < 100) {
       df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
-                    , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
-                    Telomere_length = NA)
+                  , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
+                  Telomere_length = NA)
       return(df)
     }  
   } # not considered a Telomere
   
-  output_telo_fasta <- paste(output_dir, paste(toString(current_serial), "fasta", sep = "."),  sep = "/")
+  output_telo_fasta <- paste(output_dir, paste(toString(current_serial), 
+                       "fasta", sep = "."),  sep = "/")
   writeXStringSet(current_seq, output_telo_fasta)
   
   plot_single_telo(x_length = max(max_length, length(current_seq_unlist)),
-                   seq_length = length(current_seq_unlist), subs =  analyze_list[[1]], 
-                   serial_num = current_serial, seq_start = start(telo_irange), 
-                   seq_end = end(telo_irange), save_it = TRUE, main_title = title,   
-                   w = 750, h = 300, output_jpegs = output_jpegs)
+        seq_length = length(current_seq_unlist), subs =  analyze_list[[1]], 
+        serial_num = current_serial, seq_start = start(telo_irange), 
+        seq_end = end(telo_irange), save_it = TRUE, main_title = title,   
+        w = 750, h = 300, output_jpegs = output_jpegs)
   
   plot_single_telo(x_length = length(current_seq_unlist), seq_length = 
                      length(current_seq_unlist), subs =  analyze_list[[1]], 
@@ -570,9 +571,9 @@ analyze_read <- function(current_seq, current_serial ,pattern_list, min_density,
   
   df <- df %>%
     add_row(Serial = current_serial, sequence_ID = current_fastq_name, 
-            sequence_length = length(current_seq_unlist), telo_density = telo_density
-            , Telomere_start = start(telo_irange), Telomere_end = 
-              end(telo_irange), Telomere_length = width(telo_irange))
+    sequence_length = length(current_seq_unlist), telo_density = telo_density
+    , Telomere_start = start(telo_irange), Telomere_end = 
+    end(telo_irange), Telomere_length = width(telo_irange))
   
   return(df)
 }
@@ -693,17 +694,15 @@ run_with_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
     dir.create(output_dir)
   }
   
-  # create a log file
-  tmp <- file.path(output_dir, "run_summary.log")
-  
-  samples_filtered <- filter_reads(samples = samples, patterns = patterns, do_rc = do_rc, num_of_cores = num_of_cores) 
+  samples_filtered <- filter_reads(samples = samples, patterns = patterns, 
+                      do_rc = do_rc, num_of_cores = num_of_cores) 
   
   if (is.na(samples_filtered[1])) {
-    return (NA)
+    return(NA)
   }else {
     search_patterns(samples_filtered, pattern_list = patterns, max_length = 
-                      max(max(width(samples_filtered)), 150000), output_dir = 
-                      output_dir, min_density = 0.3, serial_start = serial_start)
+                  max(max(width(samples_filtered)), 150000), output_dir = 
+                  output_dir, min_density = 0.3, serial_start = serial_start)
   }
 }
 
@@ -737,10 +736,10 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10) {
   
   
   logical_100 <- mclapply(X = samp_100, FUN = filter_density, 
-                          patterns = dna_rc_patterns, min_density = 0.175, mc.cores = num_of_cores) 
+      patterns = dna_rc_patterns, min_density = 0.175, mc.cores = num_of_cores) 
   
   
-  test_filter2 <- samps_1000[unlist(logical_100)]
+  #test_filter2 <- samps_1000[unlist(logical_100)]
   
   #logical_100 <-sapply(X = samp_100, FUN = filter_density, patterns = dna_rc_patterns, min_density = 0.175)
   
@@ -752,10 +751,10 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10) {
   
   if (length(samps_1000) < 1) {
     message("No read have passed the filteration at run_with_rc_and_filter!")
-    return (NA)
+    return(NA)
   }else {
     
-    return (samps_1000)
+    return(samps_1000)
   }
 }
 
@@ -793,7 +792,7 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 #' 14. some reads (about 1 %) do,'t pass the filteration but are found to be telomeric with search_patterns: as the telomere start after more than 160 first bases
 #' 15. Add interactive plotly plot with telomeric density and sequence letters on buttom + ability to zoom in/out ....
 #' 16. Add the matchPatterns with indels and max.mis == 2 at the edges -> plot at the graph as yellow for pattern with error....
-#' 17. Swith instersect.Vector/union.Vector to IRange intersect ....
+#' 17. Swith instersect.Vector/union.Vector to IRange intersect  - done.
 
 
 
@@ -818,11 +817,16 @@ log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE) # Se
 
 log_print("The input files:", hide_notes = TRUE)
 # add the names of the files which we analyze.
-filepath = dir(full.names = TRUE, 
-               path = args[1])
 
-for(i in seq_along(filepath)) {
-  log_print(filepath[i], hide_notes = TRUE)
+if(file.exists(args[1])) {
+  log_print(args[1], hide_notes = TRUE)
+} else {
+  filepath = dir(full.names = TRUE, 
+                 path = args[1])
+  
+  for(i in seq_along(filepath)) {
+    log_print(filepath[i], hide_notes = TRUE)
+  }
 }
 
 
@@ -874,7 +878,7 @@ df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9,
 
 # add row number
 df_summary <- df_summary %>% 
-  mutate(row_number = seq_len(nrow(df)), .before = "Serial")
+  mutate(row_number = seq_len(nrow(df_summary)), .before = "Serial")
 
 
 
@@ -883,7 +887,7 @@ log_print(base::paste0("% of total reads: ", toString(round( (100*nrow(df_summar
 
 # summary statistics of the Telomeric reads
 log_print("Summary statistics for the Telomeric reads:", hide_notes = TRUE)
-log_print("reads length:", , hide_notes = TRUE)
+log_print("reads length:", hide_notes = TRUE)
 log_print(summary(df_summary$sequence_length), hide_notes = TRUE)
 log_print("Telomere length:", hide_notes = TRUE)
 log_print(summary(df_summary$Telomere_length), hide_notes = TRUE)
