@@ -861,8 +861,9 @@ df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_
 df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9, df10))
 # end of parallel try
 
-
-
+# add row number
+df_summary <- df_summary %>% 
+  mutate(row_number = seq_len(nrow(df)), .before = "Serial")
 
 
 
