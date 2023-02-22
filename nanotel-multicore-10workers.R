@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# args for input_path, format(fastq/a) and output_path
+# args for input_path, output_path  and format(fastq/a)
 args <- commandArgs(trailingOnly = TRUE) 
 ################################################################
 # Author: Dan Lichtental
@@ -14,6 +14,7 @@ args <- commandArgs(trailingOnly = TRUE)
 # "Rscript --vanilla nanotel-multicore-10workers.R input_dir output_dir format"
 # format can be either fasta or fastq, input_dir can be either a full path for a
 # single fastq/a file or a directory containing fastq/a files.
+# Please try to give the output dir outside the input dir path and vice versa
 
 # The 'confilcted' package tries to make your function choice explicit.
 #   it produce an error if a function name is found on 2 or more packages!!!
@@ -27,7 +28,7 @@ library(future)
 utils::globalVariables(c("start_index"))
 
 split_telo <- function(dna_seq, sub_length = 100) {
-  #' @title Splits a DNA sequence nto subsequences. 
+  #' @title Splits a DNA sequence into subsequences. 
   #' @description This function calculate the sequence len and creates IRanges 
   #' objects of subseuences of a given length.
   #' if The dna_seq%%subseq != 0   and last' width < sub_length/2 Then we will 
@@ -532,14 +533,14 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
     #' Onc ew have the Telomere indices calculate the density of the patterns 
     #' within it's range.
     telo_density <- get_sub_density(telo_irange, analyze_list[[2]][[2]])
-  } else {
-    if (width(telo_irange) < 100) {
+  } 
+  
+  if (width(telo_irange) < 100) {
       df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
                   , telo_density = NA, Telomere_start = NA, Telomere_end = NA, 
                   Telomere_length = NA)
       return(df)
-    }  
-  } # not considered a Telomere
+  }  # not considered a Telomere
   
   output_telo_fasta <- paste(output_dir, paste(toString(current_serial), 
                        "fasta", sep = "."),  sep = "/")
@@ -591,6 +592,11 @@ create_dirs <- function(output_dir) {
   if (!dir.exists(output_jpegs_1)) {
     dir.create(output_jpegs_1)
   }
+  
+  reads_dir <- paste(output_dir, "reads", sep = "/")
+  if (!dir.exists(reads_dir)) {
+    dir.create(reads_dir)
+  }
 }
 
 
@@ -614,7 +620,7 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   # output_telo_fasta <- paste(output_dir, paste("reads", "fasta", sep = "."),  sep = "/")
   output_jpegs <- paste(output_dir, "single_read_plots", sep = "/")
   output_jpegs_1 <- paste(output_dir, "single_read_plots_adj", sep = "/")
-  
+  output_reads <- paste(output_dir, "reads", sep = "/")
   
   #max_length <- max(width(sample_telomeres))
   #  I HAVE ADDED TLOMERE LENGTH, START @ END
@@ -633,7 +639,7 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
     #telo_irange <- gray_area_adges(telo_irange, current_seq)
     curr_df <- analyze_read(current_seq = sample_telomeres[i], current_serial =
                current_serial, pattern_list = pattern_list, min_density = 
-               min_density, output_dir = output_dir, output_jpegs = output_jpegs, 
+               min_density, output_dir = output_reads, output_jpegs = output_jpegs, 
                output_jpegs_1 = output_jpegs_1, max_length = max_length, title = title)
     # not a telomeric read
     if (is.na(curr_df[1,1])) {
@@ -723,7 +729,7 @@ create_sample <- function(input_path, format = "fastq") {
   return(sample)
 }
 
-filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10) {
+filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10, subread_width = 200, right_edge = TRUE, trimm_length = 70) {
   samps_1000 <- samples[width(samples) >= 1e3]
   if (isTRUE(do_rc)) {
     samps_1000 <- Biostrings::reverseComplement(samps_1000)
@@ -731,7 +737,14 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10) {
   
   cl <- makeCluster(num_of_cores)
   # change to -(61+ just incase there are indels ( barcode_telorette == 61))
-  samp_100 <- parLapply(cl, samps_1000, subseq, end = -67, width = 100)  
+  if(right_edge) {
+    trimm_length <- trimm_length +1
+    trimm_length <- -1*trimm_length
+    samp_100 <- parLapply(cl, samps_1000, subseq, end = trimm_length, width = subread_width) 
+  } else { # check the start of the read (left)
+    samp_100 <- parLapply(cl, samps_1000, subseq, start = trimm_length + 1, width = subread_width) 
+  }
+   
   stopCluster(cl)
   
   
@@ -758,7 +771,20 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10) {
   }
 }
 
-
+bool_question <- function(question) {
+  if(assertthat::is.string(question) == FALSE) {
+    stop("The input for bool_question should be a string!", call. = TRUE)
+  }
+  ans <- ""
+  repeat{ 
+    writeLines(text = question, con = "stdin")
+    ans <- readLines(con = "stdin", n = 1 )
+    if(ans %in% list("Yes", "yes", "No", "no")) {
+      break
+    } 
+  }
+  return (ans %in% list("yes", "Yes"))
+}
 
 
 ################## Arguments ######################################################
@@ -788,12 +814,13 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 #' 10. Check the warrnings : see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=10
 #' 11. Add error messages using stop for bad arguments... see https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=13
 #' 12. Use try for fixing bad arguments such as: 'fasa -> use fasta instead ....
-#' 13. Make parallel option for searh_patterns
+#' 13. Make parallel option for searh_patterns - done using future ( dn't work on windows os)
 #' 14. some reads (about 1 %) do,'t pass the filteration but are found to be telomeric with search_patterns: as the telomere start after more than 160 first bases
 #' 15. Add interactive plotly plot with telomeric density and sequence letters on buttom + ability to zoom in/out ....
 #' 16. Add the matchPatterns with indels and max.mis == 2 at the edges -> plot at the graph as yellow for pattern with error....
 #' 17. Swith instersect.Vector/union.Vector to IRange intersect  - done.
-
+#' 18. use assertive  https://www.rdocumentation.org/packages/assertive/versions/0.3-6 for checking assert_is_numeric(..) ....
+#' 19. fixed file printing: exclude the input_dir
 
 
 # code for running script on linux shell - use log file for statistics
@@ -803,6 +830,7 @@ if (length(args) < 2) {
   # default output file
   args[3] = "fastq"
 }
+
 
 # log function blueprint : summary(sample), %telomeric_reads , summary(telo_read) ...
 # I need to create a log funcion : with ifelse ( if telomeric patterns were found or not -> no one passed the filteration or df isempty ....)
@@ -831,13 +859,25 @@ if(dir.exists(args[1])) {
 
 
 dna_reads <- create_sample(input_path = args[1], format = args[3])
-dna_reads <- Biostrings::reverseComplement(dna_reads)
-
 # Print data to log: length(sample), nrow(df), summary sts of read_leangth, Telo_length
 log_print(base::paste("Total reads in sample:", toString(length(dna_reads)), "\n"), hide_notes = TRUE)
 log_print("Summary statistics of the sample reads length:", hide_notes = TRUE)
 log_print(summary(width(dna_reads)), hide_notes = TRUE)
 log_print("\n", hide_notes = TRUE)
+
+
+rc <- bool_question("Use reverse complement ? (print yes/Yes or no/No)")
+filter <- bool_question("Use the filteration ? (print yes/Yes or no/No)/nIt filters the reads according to length (>= 1000 and the density at the edge of the read.")
+if(filter) {
+  right_edge <- bool_question("Check the right edge? (print yes/Yes or no/No(for left edge))/n Notice if you chosed to use the reverse complement!")
+  dna_reads <- filter_reads(samples = dna_reads, patterns = dna_rc_patterns, 
+                            do_rc = rc, num_of_cores = 10, subread_width = 200, right_edge = right_edge)
+} else {
+  if(rc) {
+    dna_reads <- reverseComplement(dna_reads)
+  }
+}
+
 
 
 create_dirs(output_dir = args[2])
@@ -852,7 +892,7 @@ create_dirs(output_dir = args[2])
 
 # now try to use future::plan(ulticore, workers = 10) , I need to set the save_summary to false, and after reduce save it.
 # also save the reads as 1 read (serian.fasta : 1.fasta ...) per file instead of reads.fasta.
-options(future.globals.maxSize = 1048576000)
+options(future.globals.maxSize = 1048576000*1.5) # 1.5 gigabyte max
 plan(multicore, workers = 10)
 
 # create indices for each worker using split 
@@ -901,3 +941,4 @@ log_print(base::paste("Work ended at:", toString(t2)), hide_notes = TRUE)
 # Close log
 log_close()
 writeLines(readLines(lf))
+
