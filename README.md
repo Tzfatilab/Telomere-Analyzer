@@ -1,5 +1,9 @@
 # Telomere-Analyzer
- Search over DNA sequences for telomeric patterns.
+ This program searches DNA sequences for telomeric patterns and includes 4 outputs:
+ 1. A FASTA file containing only DNA reads possesing a telomere
+ 2. A detailed CSV-format table with the telomere length, location and ratio of telomeric patterns it contains for each DNA sequence.
+ 3. A folder named **single_read_plots** containing plots of the telomere-pattern density throughout the DNA sequence for all sequences.
+ 4. A similar folder named **single_read_plots_adj** with the same plots, all adjusted to 100 kb, aiding telomere length comparison.
  
 Use the nanotel-multicore-10workers.R to run the program.
 All other files for now is just a draft with a lot of remarks for future planning.
