@@ -1,5 +1,5 @@
 # Telomere-Analyzer
- This program searches DNA sequences for telomeric patterns and includes 4 outputs:
+### This program searches DNA sequences for telomeric patterns and includes 4 outputs:
  1. A FASTA file containing only DNA reads possesing a telomere
  2. A detailed CSV-format table with the telomere length, location and ratio of telomeric patterns it contains for each DNA sequence.
  3. A folder named **single_read_plots** containing plots of the telomere-pattern density throughout the DNA sequence for all sequences.
