@@ -6,7 +6,7 @@
  4. A similar folder named **single_read_plots_adj** with the same plots, all adjusted to 100 kb, aiding telomere length comparison.
  5. A folder named **log** with summary statistics on the analysis run.
  
-If workig on a Linux OS, use the *nanotel-multicore-10workers.R* to run the program, otherwise use *nanotel.R*. The difference between the two is the use of parallel computing in the former which speeds up the computation process.
+If workig on a Linux OS, use the *nanotel-multicore-10workers.R* to run the program, otherwise use *nanotel.R*. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
 All other files for now are just a draft with remarks for future planning.
 
 This script is suitable for running in Linux and demands 4 arguments: (1) The code file used for analysis, (2) DNA sequences to be tested in FASTA or FASTQ format, (3) An output directory, (4) Specification of sequences file type. 
@@ -20,6 +20,14 @@ Replace parameters as following:
 
 **Make sure the output_dir is not a subdirectory of input_dir or vice versa**
 
+After executing the code, a question will be asked "Use reverse complement ?". This refers to the default telomeric pattern which is searched - **CCCTAA**. Type *yes* if the desirable pattern to be searched is **TTAGGG**, otherwise type *no*.  
+A second question will be asked "Use the filtration ?". This question refers to...........................
+
+
+Before running the code, consider changing certain parameters in the code itself that are set by default to fixed values:
+- The telomere pattern density is searched in segments of 100 consecutive bases. This could be changed in the *sub_length* parameter under the *analyze_subtelos* function.
+- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the *min_density* parameter under the *analyze_subtelos* function.
+- 
 
 
 
