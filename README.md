@@ -24,14 +24,10 @@ After executing the code, a question will be asked "Use reverse complement ?". T
 A second question will be asked "Use the filtration ?". This question refers to...........................
 
 
-Before running the code, consider changing certain parameters in the code itself that are set by default to fixed values:
+Before running the code, consider changing certain parameters in the code itself that by default have set values:
 - The telomere pattern density is searched in segments of 100 consecutive bases. This could be changed in the *sub_length* parameter under the *analyze_subtelos* function.
-- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the *min_density* parameter under the *analyze_subtelos* function.
-- 
+- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the *min_density* parameter under the *analyze_subtelos* function. This could affect where the program sets the telomere beginning.
 
+##### Preinstallations:  
+The code was written in R 4.2.2 version. The following R packages should be preinstalled: conflicted, tidyverse, logr, future, IRanges, and Biostrings, while the last two are part of Bioconductor and should be installed through the BiocManager package. 
 
-
-Before running the nanotel: check the default args of the functions: you may want to change some arguments such as the pattern, min_density etc...
-
-
-The script is supported on Linux OS.
