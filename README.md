@@ -9,8 +9,10 @@
  Plot example from the *single_read_plots* folder:
 ![plot_example](https://github.com/Dan-Lt/Telomere-Analyzer/blob/main/read4.jpeg)
 
-[Changing default parameters](###changing-default-parameters) 
- 
+- [Changing default parameters](###changing-default-parameters) 
+- [Preinstallations](###preinstallations)
+- [Citing NanoTel](###citing-nanotel)
+
 If workig on a Linux OS, use the *nanotel-multicore-10workers.R* to run the program, otherwise use *nanotel.R*. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
 All other files for now are just a draft with remarks for future planning.
 
