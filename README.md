@@ -6,12 +6,17 @@
  4. A similar folder named **single_read_plots_adj** with the same plots, all adjusted to 100 kb, aiding telomere length comparison.
  5. A folder named **log** with summary statistics on the analysis run.
  
- Plot example from the *single_read_plots* folder:
+ Example of hypothetical plot in the *single_read_plots* folder:
 ![plot_example](https://github.com/Dan-Lt/Telomere-Analyzer/blob/main/read4.jpeg)
 
+## Contents
+
+- [Instructions](#instructions)
 - [Changing default parameters](#changing-default-parameters) 
-- [Preinstallations](#preinstallations)
+- [Required preinstallations](#preinstallations)
 - [Citing NanoTel](#citing-nanotel)
+
+### Instructions
 
 If workig on a Linux OS, use the *nanotel-multicore-10workers.R* to run the program, otherwise use *nanotel.R*. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
 All other files for now are just a draft with remarks for future planning.
