@@ -28,6 +28,11 @@ library(future)
 library(ggprism)
 utils::globalVariables(c("start_index"))
 
+#' TODO: replace all for loops to map with a private functio
+#' instead of for(...{if...else...} : map(x, p_function)
+#' map(numlist, ~.x %>% sqrt() %>% sin())
+
+
 
 # global vars
 global_min_density <- 0.3
