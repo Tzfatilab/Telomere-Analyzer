@@ -5,7 +5,7 @@ args <- commandArgs(trailingOnly = TRUE)
 # Author: Dan Lichtental
 # Copyright (c) Dan Lichtental, 2022
 # Email:  dan.lichtental@mail.huji.ac.il
-# Last updated:  2022-12-12
+# Last updated:  2023-03-09
 # Script Name: Telomere pattern finder
 # Script Description: In this script we search over fastq file sequences for 
 # telomeric patterns.
@@ -25,9 +25,19 @@ library(IRanges)
 library(parallel)
 library(logr)
 library(future)
+library(ggprism)
 utils::globalVariables(c("start_index"))
 
-split_telo <- function(dna_seq, sub_length = 100) {
+
+# global vars
+global_min_density <- 0.3
+lockBinding("global_min_density", globalenv())
+global_subseq_length <- 100
+lockBinding("global_subseq_length", globalenv())
+
+
+
+split_telo <- function(dna_seq, sub_length) {
   #' @title Splits a DNA sequence into subsequences. 
   #' @description This function calculate the sequence len and creates IRanges 
   #' objects of subseuences of a given length.
@@ -62,6 +72,7 @@ split_telo <- function(dna_seq, sub_length = 100) {
 # my improvment: fiding the IRanges and making union for overlaps and then 
 #calculate according to sum(width of the IRanges)
 # The calculation is on the full sequence and it is not fit for subsequences
+#' use purrr::map to replace the for loops code
 get_density_iranges <- function(sequence, patterns) {
   #' @title Pattern searching function.
   #' @description: get the density of a given pattern or a total density of a 
@@ -79,11 +90,11 @@ get_density_iranges <- function(sequence, patterns) {
     patterns <- unique(patterns)  # make sure there are no dups
     for (pat in patterns){
       mp_all <- IRanges::union(mp_all, matchPattern(pattern = pat, subject = 
-                       unlist(sequence), max.mismatch = 0))
+                       unlist(sequence), max.mismatch = 0, fixed = FALSE))
     }
   }else {
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence), 
-                           max.mismatch = 0)
+                           max.mismatch = 0, fixed = FALSE)
     mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
   }
   total_density <- sum(width(mp_all)) / nchar(sequence)
@@ -95,6 +106,7 @@ get_density_iranges <- function(sequence, patterns) {
 # my improvment: fiding the IRanges and making union for overlaps and then 
 # calculate according to sum(width of the IRanges)
 # The calculation is on the full sequence and it is not fit for subsequences
+#' use purrr::map to replace the for loops code
 get_density_iranges_with_csv <- function(sequence, patterns, output_path = NA) {
   #' @title Pattern searching function.
   #' @description: get the density of a given pattern or a total density of a 
@@ -116,14 +128,14 @@ get_density_iranges_with_csv <- function(sequence, patterns, output_path = NA) {
     patterns <- unique(patterns)  # make sure there are no dups
     for (pat in patterns) {
       curr_match <- matchPattern(pattern = pat, subject = unlist(sequence), 
-                                 max.mismatch = 0)
+                                 max.mismatch = 0, fixed = FALSE)
       patterns_df <- add_row(patterns_df, patterns = as.data.frame(curr_match)$x
                      , start_idx = start(curr_match), end_idx = end(curr_match))
       mp_all <- IRanges::union(mp_all, curr_match)
     }
   }else {
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence),
-                           max.mismatch = 0)
+                           max.mismatch = 0, fixed = FALSE)
     patterns_df <- add_row(patterns_df, patterns = as.data.frame(mp_all)$x, 
                            start_idx = start(mp_all), end_idx = end(mp_all))
     mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
@@ -161,9 +173,18 @@ get_sub_density <- function(sub_irange, ranges) {
 }
 
 
+
+#' future changes:
+#'   1. remove the ID column
+#'   2. class: give the class a name according to type "CCCTAA/TTAGGG"
+#'   3. Add the middle_point as in the plotTelomere.R
+#'   4. use purrr::map to replace the for loops code
+#'   5. Give names to the elements in the list : for example:
+#'      m_list[["subtelos]] <- subtelos  
+#'      ( see the course Foundations of Functional Programming with purrr)
 ###########3 My cahnge from prev - return a list 0f (df, total_density) ######
-analyze_subtelos <- function(dna_seq, patterns, sub_length = 100, 
-                       min_density = 0.3) { 
+analyze_subtelos <- function(dna_seq, patterns, sub_length, 
+                       min_density) { 
   # return list(subtelos, list_density_mp[1])
   #' @title Analyze the patterns for each subsequence.
   #' @description s split a dna sequence to subsequences and calculate the 
@@ -216,6 +237,13 @@ analyze_subtelos <- function(dna_seq, patterns, sub_length = 100,
 
 
 # I need to put The classes as an arument ?
+#' Have to create help-functions to this function - it is too long"
+#' help_function1 : find_the_start_of_telomere
+#' help_function2: find_the_end_of_telomere
+#' end/start should both use the find first/last pattern at the edges
+#' check_edges: see if we can go forethere with the indice: using the 
+#' matchpattern with mismathes = 2 + indels.
+#' 
 find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, 
                         min_density_score = 2) { # 15,10 for sub_length == 20 
   #' @title: Find the position of the Telomere(subsequence) within the seuence.
@@ -450,6 +478,10 @@ plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start,
 
 #' get a single read find and analyze the telomeric patterns in it.
 #' Plot graphs and return a summary row.
+#' This function is too long - make it more readable and shorter
+#' get rid of the id, instead use a shortcut od the read_id as name: once done
+#' with all the reads -> reaname all the files accoding to the final df.
+#' Also make dir for each different type of plot
 analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
                          output_dir, output_jpegs, output_jpegs_1, max_length, title) {
   current_fastq_name <- names(current_seq)
@@ -458,7 +490,7 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   
   # returns a a list of (a data frame, list(numeric: total density,iranges)) 
   analyze_list <- analyze_subtelos(dna_seq = current_seq_unlist, patterns =  
-                                     pattern_list, min_density = min_density)
+                                     pattern_list, min_density = min_density, sub_length = global_subseq_length)
   telo_irange <- find_telo_position(seq_length = length(current_seq_unlist), 
                                     subtelos = analyze_list[[1]], 
                                     min_in_a_row = 3, min_density_score = 2)
@@ -673,11 +705,11 @@ filter_density <- function(sequence, patterns, min_density = 0.18) {
     patterns <- unique(patterns)  # make sure there are no dups
     for (pat in patterns){
       mp_all <- IRanges::union(mp_all, Biostrings::matchPattern(pattern = pat, 
-                subject = unlist(sequence), max.mismatch = 0))
+                subject = unlist(sequence), max.mismatch = 0, fixed = FALSE))
     }
   } else {
     mp_all <- Biostrings::matchPattern(pattern = patterns, 
-              subject = unlist(sequence), max.mismatch = 0)
+              subject = unlist(sequence), max.mismatch = 0, fixed = FALSE)
     mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
   }
   
@@ -708,7 +740,7 @@ run_with_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
   }else {
     search_patterns(samples_filtered, pattern_list = patterns, max_length = 
                   max(max(width(samples_filtered)), 150000), output_dir = 
-                  output_dir, min_density = 0.3, serial_start = serial_start)
+                  output_dir, min_density = global_min_density, serial_start = serial_start)
   }
 }
 
@@ -749,7 +781,7 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10, su
   
   
   logical_100 <- mclapply(X = samp_100, FUN = filter_density, 
-      patterns = dna_rc_patterns, min_density = 0.175, mc.cores = num_of_cores) 
+      patterns = dna_rc_patterns, min_density = global_min_density*0.8, mc.cores = num_of_cores) 
   
   
   #test_filter2 <- samps_1000[unlist(logical_100)]
@@ -789,12 +821,7 @@ bool_question <- function(question) {
 
 ################## Arguments ######################################################
 
-PATTERNS_LIST <- list("CCCTAA", "CCCTAG", "CCCTGA", "CCCTGG")  # CCCTRR
-PATTERNS_LIST <- append(PATTERNS_LIST, list("CCTAAC", "CCTAGC", "CCTGAC", "CCTGGC")) # add CCTRRC
-PATTERNS_LIST <- append(PATTERNS_LIST, list("CTAACC", "CTAGCC", "CTGACC", "CTGGCC")) # add CTRRCC
-PATTERNS_LIST <- append(PATTERNS_LIST, list("TAACCC", "TAGCCC", "TGACCC", "TGGCCC")) # add TRRCCC
-PATTERNS_LIST <- append(PATTERNS_LIST, list("AACCCT", "AGCCCT", "GACCCT", "GGCCCT")) # add RRCCCT
-PATTERNS_LIST <- append(PATTERNS_LIST,list("ACCCTA", "GCCCTA", "ACCCTG", "GCCCTG"))  # add RCCCTR
+PATTERNS_LIST <- list("CCCTRR", "CCTRRC", "CTRRCC", "TRRCCC", "RRCCCT", "RCCCTR")  
 
 patterns_dna <- lapply(PATTERNS_LIST, DNAString)
 dna_rc_patterns <- lapply(patterns_dna, Biostrings::reverseComplement)
@@ -859,6 +886,7 @@ if(dir.exists(args[1])) {
 
 
 dna_reads <- create_sample(input_path = args[1], format = args[3])
+global_total_length <- length(dna_reads)
 # Print data to log: length(sample), nrow(df), summary sts of read_leangth, Telo_length
 log_print(base::paste("Total reads in sample:", toString(length(dna_reads)), "\n"), hide_notes = TRUE)
 log_print("Summary statistics of the sample reads length:", hide_notes = TRUE)
@@ -867,9 +895,9 @@ log_print("\n", hide_notes = TRUE)
 
 
 rc <- bool_question("Use reverse complement ? (print yes/Yes or no/No)")
-filter <- bool_question("Use the filteration ? (print yes/Yes or no/No)/nIt filters the reads according to length (>= 1000 and the density at the edge of the read.")
+filter <- bool_question("Use the filteration ? (print yes/Yes or no/No)\nIt filters the reads according to length (>= 1000 and the density at the edge of the read).")
 if(filter) {
-  right_edge <- bool_question("Check the right edge? (print yes/Yes or no/No(for left edge))/n Notice if you chosed to use the reverse complement!")
+  right_edge <- bool_question("Check the right edge? (print yes/Yes or no/No(for left edge))\n Notice if you chosed to use the reverse complement!")
   dna_reads <- filter_reads(samples = dna_reads, patterns = dna_rc_patterns, 
                             do_rc = rc, num_of_cores = 10, subread_width = 200, right_edge = right_edge)
 } else {
@@ -902,16 +930,16 @@ seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
 groups <- 1:groups_length
 split_seq <- suppressWarnings(split(x = seq_over_length, f = groups))
 
-df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = 1 )
-df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(split_seq$`1`) + 1 )
-df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:2])) + 1)
-df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:3])) + 1)
-df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:4])) + 1)
-df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:5])) + 1)
-df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:6])) + 1)
-df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:7])) + 1)
-df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:8])) + 1)
-df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = length(unlist(split_seq[1:9])) + 1)
+df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = 1 )
+df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(split_seq$`1`) + 1 )
+df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:2])) + 1)
+df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:3])) + 1)
+df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:4])) + 1)
+df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:5])) + 1)
+df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:6])) + 1)
+df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:7])) + 1)
+df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:8])) + 1)
+df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:9])) + 1)
 
 df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9, df10))
 # end of parallel try
@@ -923,7 +951,7 @@ df_summary <- df_summary %>%
 
 
 log_print(base::paste0("Numer of reads which identified as Telomeric: ", nrow(df_summary)), hide_notes = TRUE)
-log_print(base::paste0("% of total reads: ", toString(round( (100*nrow(df_summary)) / length(dna_reads), 2 ) ), "%\n" ), hide_notes = TRUE)
+log_print(base::paste0("% of total reads: ", toString(round( (100*nrow(df_summary)) / global_total_length, 2 ) ), "%\n" ), hide_notes = TRUE)
 
 # summary statistics of the Telomeric reads
 log_print("Summary statistics for the Telomeric reads:", hide_notes = TRUE)
