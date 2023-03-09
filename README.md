@@ -33,13 +33,13 @@ Replace parameters as following:
 **Make sure the output_dir is not a subdirectory of input_dir or vice versa**
 
 After executing the code, a question will be asked `Use reverse complement ?`. This refers to the default telomeric pattern which is searched - **CCCTAA**. Type *yes* if the desirable pattern to be searched is **TTAGGG**, otherwise type *no*.  
-A second question will be asked `Use the filtration ?`. This question refers to...........................
+A second question will be asked `Use the filtration ?`. This question refers to filteration with regard the edge of the read, If your assumptaion is that each read should start/end with a telomeric pattern , than the filteration function will filter only the reads which thier edge has a telomeric pattern density.
 
   
 ### Changing default parameters  
 Before running the code, consider changing certain parameters in the code itself that by default have set values:
-- The telomere pattern density is searched in segments of 100 consecutive bases. This could be changed in the `sub_length` parameter under the `analyze_subtelos` function.
-- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the `min_density` parameter under the `analyze_subtelos` function. This could affect where the program sets the telomere beginning.
+- The telomere pattern density is searched in segments of 100 consecutive bases. This could be changed in the `global_subseq_length` parameter.
+- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the `global_min_density` parameter. This could affect where the program sets the telomere beginning.
 
   
 ### Preinstallations  
