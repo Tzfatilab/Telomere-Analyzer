@@ -48,4 +48,3 @@ The code was written in R 4.2.2 version. The following R packages should be prei
 ### Citing NanoTel 
 If you use NanoTel in your work, please cite:  
 ..........................
-
