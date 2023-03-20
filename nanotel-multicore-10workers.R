@@ -899,10 +899,10 @@ log_print(summary(width(dna_reads)), hide_notes = TRUE)
 log_print("\n", hide_notes = TRUE)
 
 
-rc <- bool_question("Use reverse complement ? (print yes/Yes or no/No)")
-filter <- bool_question("Use the filteration ? (print yes/Yes or no/No)\nIt filters the reads according to length (>= 1000 and the density at the edge of the read).")
+rc <- bool_question("Use reverse complement? (print yes/Yes or no/No)")
+filter <- bool_question("Use the filteration? (print yes/Yes or no/No)\nIt filters the reads according to length (>= 1000 nt) and the density at the edge of the read).")
 if(filter) {
-  right_edge <- bool_question("Check the right edge? (print yes/Yes or no/No(for left edge))\n Notice if you chosed to use the reverse complement!")
+  right_edge <- bool_question("Check the right edge? (print yes/Yes or no/No)\n Be aware if you chose to use the reverse complement!")
   dna_reads <- filter_reads(samples = dna_reads, patterns = dna_rc_patterns, 
                             do_rc = rc, num_of_cores = 10, subread_width = 200, right_edge = right_edge)
 } else {
