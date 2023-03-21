@@ -28,7 +28,7 @@ library(future)
 library(ggprism)
 utils::globalVariables(c("start_index"))
 
-#' TODO: replace all for loops to map with a private functio
+#' TODO: replace all for loops to map with a private function
 #' instead of for(...{if...else...} : map(x, p_function)
 #' map(numlist, ~.x %>% sqrt() %>% sin())
 
@@ -426,11 +426,11 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start,
 #'ggsave currently recognises the extensions eps/ps, tex (pictex), pdf, jpeg, 
 #'tiff, png, bmp, svg and wmf (windows only).
 plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start, 
-                         seq_end, save_it = TRUE, 
-                         main_title = "", output_jpegs) { 
+                                     seq_end, save_it = TRUE, 
+                                     main_title = "", output_jpegs) { 
   #' @title plot the density over a sequence
   #' @param seq_length: The length of the sequence
-  #' @param subs: the data frame of subseuences from the analyze_subtelos 
+  #' @param subs: the data frame of subsequences from the analyze_subtelos 
   #' function
   #' @param serial_num: The serial number of the current sequence, used as the 
   #' name of the file
@@ -443,42 +443,58 @@ plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start,
   #' @param output_jpegs: the output directory for saving the file
   subs <- na.omit(subs)
   # save the densities in a csv file for later use !
-  write_csv(x = subs, file = file.path(output_jpegs, paste0(serial_num, ".csv")))
-  sub_title <- paste("read length:", seq_length, ", telomere length:", 
-                     abs(seq_start - seq_end) + 1)
+  #write_csv(x = subs, file = paste(output_jpegs, paste0(serial_num, ".csv"), sep = "/"))
   
-  my_ggplot <- ggplot2::ggplot(subs, aes(x = start_index, y = density)) +
-    geom_area(color = NA, fill = "red") +
-    # the 3 last lines are for the telomere-sub-telomre region ....
-    geom_rect(aes(xmin = seq_start, ymin = -0.01, xmax = seq_end, ymax = 0), 
-              color = "green", fill = "green")  +
-    geom_hline(yintercept = 0, linetype = "dashed") +
-    geom_hline(yintercept = 1, linetype = "dashed") +
-    labs(title = main_title, x = "Position", y = "Density", 
-         subtitle = sub_title)
+  my_ggplot <- ggplot2::ggplot(subs, aes(x = start_index/1000, y = density)) +
+    geom_area(fill = "lightcoral") +
+    geom_line(color = "black", size = 0.01) +
+    scale_size_manual(values = 0.1) + 
+    geom_rect(aes(xmin = seq_start/1000, ymin = -0.02, xmax = seq_end/1000, ymax = 0, fill = "red"), 
+              color = "black", linewidth = 0.3, key_glyph = draw_key_dotplot)  +
+    geom_hline(yintercept = 0, linetype = "dashed", size = 0.3) +
+    geom_hline(yintercept = 1, linetype = "dashed", size = 0.3) +
+    labs(title = "Telomeric repeat density", x = "Position (kb)", y = "Density", 
+         caption = paste("read length:", seq_length, ", telomere length:", abs(seq_start - seq_end) + 1)) +
+    theme_classic() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          plot.caption = element_text(hjust = 0.5, vjust = 0, size = 10),
+          axis.text=element_text(size=11),
+          axis.ticks.length.x = unit(5, "pt"),
+          axis.ticks.length.y = unit(4.5, "pt"),
+          legend.title = element_blank(),
+          legend.background = element_rect(color = "black"),
+          legend.position = c(1.1, 0.8),
+          legend.spacing = unit(20, "mm"),
+          panel.background = element_rect(color = "black", fill = NA),
+          plot.margin = margin(r = 4, t = 0.5, b = 0.5, l = 0.5, unit = "cm")) +
+    coord_cartesian(clip = "off") +
+    annotation_ticks(sides = "bl", minor.length = unit(2.8, "pt"), outside = TRUE) +
+    scale_y_continuous(breaks = seq(0.0, 1.0, 0.2), guide = "prism_minor", minor_breaks = seq(0.0, 1.0, 0.1)) +
+    scale_x_continuous(breaks = seq(0, 100, 5), limits = c(0,100), guide = "prism_minor", minor_breaks = 1:101) +
+    scale_fill_identity(guide = "legend", labels = c("Sub-telomere", "Telomere")) 
   
-  if (seq_end < seq_length) {
+  
+  if (1821 < 1821) {
     my_ggplot <- my_ggplot +
-      geom_rect(aes(xmin = seq_end, ymin = -0.01, xmax = seq_length, ymax = 0), 
-                color = "blue", fill = "blue")
-  }
+      geom_rect(aes(xmin = seq_end/1000, ymin = -0.02, xmax = seq_length/1000, ymax = 0, fill = "blue"), 
+                color = "black", linewidth = 0.3, key_glyph = draw_key_dotplot) }
   
   
-  if (seq_start > 1) {
+  if (101 > 1) {
     my_ggplot <- my_ggplot +
-      geom_rect(aes(xmin = 1, ymin = -0.01, xmax = seq_start, ymax = 0), 
-                color = "blue", fill = "blue")
-  }
+      geom_rect(aes(xmin = 0, ymin = -0.02, xmax = seq_start/1000, ymax = 0, fill = "blue"), 
+                color = "black", linewidth = 0.3, key_glyph = draw_key_dotplot) }
   
   
   # save file if specified
   if (isTRUE(save_it)) {
-    eps_path <- file.path(output_jpegs, paste0("gg_read", serial_num, ".eps"))  
-    #'ggsave currently recognises the extensions eps/ps, tex (pictex), pdf, 
+    eps_path <- paste(output_jpegs, paste0("gg_read", serial_num, ".eps"),
+                      sep = "/")  
+    #'ggsave currently recognizes the extensions eps/ps, tex (pictex), pdf, 
     #'jpeg, tiff, png, bmp, svg and wmf (windows only).
-    suppressMessages(ggsave(plot = my_ggplot, device = "eps", 
-                            filename = eps_path)) 
+    ggsave(filename = eps_path, plot = my_ggplot, device = "eps", width = 2500, height = 900, units = "px", dpi = 250)
   }
+  
 }
 
 #' get a single read find and analyze the telomeric patterns in it.
@@ -604,6 +620,10 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
                    save_it = TRUE, main_title = title,  w = 750, h = 300, 
                    output_jpegs = output_jpegs_1, eps = TRUE)
   
+  plot_single_telo_ggplot2(seq_length = length(current_seq_unlist),
+                           subs = analyze_list[[1]], serial_num = current_serial,
+                           seq_start = start(telo_irange), seq_end = end(telo_irange),
+                           save_it = TRUE, main_title = title, output_jpegs)
   
   
   
