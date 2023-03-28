@@ -7,17 +7,17 @@ args <- commandArgs(trailingOnly = TRUE)
 # Email:  dan.lichtental@mail.huji.ac.il
 # Last updated:  2023-03-09
 # Script Name: Telomere pattern finder
-# Script Description: In this script we search over fastq file sequences for 
-# telomeric patterns.
+# Script Description: In this script we search for 
+# telomeric patterns in fastq/a file sequences.
 #
 # Notes: Running the script on linux: 
-# "Rscript --vanilla nanotel-multicore-10workers.R input_dir output_dir format"
-# format can be either fasta or fastq, input_dir can be either a full path for a
+# "Rscript --vanilla NanoTel.R input_dir output_dir format"
+# Format can be either fasta or fastq, input_dir can be either a full path for a
 # single fastq/a file or a directory containing fastq/a files.
 # Please try to give the output dir outside the input dir path and vice versa
 
 # The 'confilcted' package tries to make your function choice explicit.
-#   it produce an error if a function name is found on 2 or more packages!!!
+#  it produces an error if a function name is found in 2 or more packages.
 library(conflicted)
 library(Biostrings)
 library(tidyverse)  
@@ -27,11 +27,6 @@ library(logr)
 library(future)
 library(ggprism)
 utils::globalVariables(c("start_index"))
-
-#' TODO: replace all for loops to map with a private function
-#' instead of for(...{if...else...} : map(x, p_function)
-#' map(numlist, ~.x %>% sqrt() %>% sin())
-
 
 
 # global vars
@@ -44,7 +39,7 @@ lockBinding("global_subseq_length", globalenv())
 
 split_telo <- function(dna_seq, sub_length) {
   #' @title Splits a DNA sequence into subsequences. 
-  #' @description This function calculate the sequence len and creates IRanges 
+  #' @description This function calculates the sequence length and creates IRanges 
   #' objects of subseuences of a given length.
   #' if The dna_seq%%subseq != 0   and last' width < sub_length/2 Then we will 
   #' remove this last index making the last subtelomere longer then by. 
@@ -52,7 +47,7 @@ split_telo <- function(dna_seq, sub_length) {
   #' example subtelomere of length < sub_length/2 which is too short to consider
   #'  -> then the last subtelomere is a bit longer)
   #' If the length of dna_seq is less then the sub_length it will return an 
-  #' empty Iranges Object.            
+  #' empty Iranges object.            
   #' @usage 
   #' @param dna_seq: DNAString object 
   #' @param sub_length: The length of each subsequence
@@ -74,10 +69,6 @@ split_telo <- function(dna_seq, sub_length) {
 
 
 
-# my improvment: fiding the IRanges and making union for overlaps and then 
-#calculate according to sum(width of the IRanges)
-# The calculation is on the full sequence and it is not fit for subsequences
-#' use purrr::map to replace the for loops code
 get_density_iranges <- function(sequence, patterns) {
   #' @title Pattern searching function.
   #' @description: get the density of a given pattern or a total density of a 
@@ -85,8 +76,8 @@ get_density_iranges <- function(sequence, patterns) {
   #' @param pattern: a list of patterns or a string of 1 pattern.
   #' @param sequence: DNAString object
   #' @value A numeric for the total density of the pattern(patterns) in the 
-  #' sequences, a IRanges object of the indcies of the patterns found.
-  #' @return a tuple of (density, IRanges) Total density of all the patterns in 
+  #' sequences, an IRanges object of the indices of the patterns found.
+  #' @return a tupple of (density, IRanges) Total density of all the patterns in 
   #' the list( % of the patterns in this sequence) and the IRanges of them
   #' @examples 
   total_density <- 0 
@@ -241,7 +232,6 @@ analyze_subtelos <- function(dna_seq, patterns, sub_length,
 #  a a list of (a data frame, numeric: total density) 
 
 
-# I need to put The classes as an arument ?
 #' Have to create help-functions to this function - it is too long"
 #' help_function1 : find_the_start_of_telomere
 #' help_function2: find_the_end_of_telomere
@@ -423,7 +413,7 @@ plot_single_telo <- function(x_length, seq_length, subs, serial_num, seq_start,
 }
 
 # add options for the image saved:
-#'ggsave currently recognises the extensions eps/ps, tex (pictex), pdf, jpeg, 
+#'ggsave currently recognizes the extensions eps/ps, tex (pictex), pdf, jpeg, 
 #'tiff, png, bmp, svg and wmf (windows only).
 plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start, 
                                      seq_end, save_it = TRUE, 
@@ -447,12 +437,12 @@ plot_single_telo_ggplot2 <- function(seq_length, subs, serial_num, seq_start,
   
   my_ggplot <- ggplot2::ggplot(subs, aes(x = start_index/1000, y = density)) +
     geom_area(fill = "lightcoral") +
-    geom_line(color = "black", size = 0.01) +
+    geom_line(color = "black", linewidth = 0.01) +
     scale_size_manual(values = 0.1) + 
     geom_rect(aes(xmin = seq_start/1000, ymin = -0.02, xmax = seq_end/1000, ymax = 0, fill = "red"), 
               color = "black", linewidth = 0.3, key_glyph = draw_key_dotplot)  +
-    geom_hline(yintercept = 0, linetype = "dashed", size = 0.3) +
-    geom_hline(yintercept = 1, linetype = "dashed", size = 0.3) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.3) +
+    geom_hline(yintercept = 1, linetype = "dashed", linewidth = 0.3) +
     labs(title = "Telomeric repeat density", x = "Position (kb)", y = "Density", 
          caption = paste("read length:", seq_length, ", telomere length:", abs(seq_start - seq_end) + 1)) +
     theme_classic() +
@@ -855,11 +845,10 @@ dna_rc_patterns <- lapply(dna_rc_patterns, toString)
 
 ####################################################
 # TODO
-# todo: 
 #' 2. Make a package
 #' 3. upload to git
 #' 4. Add a subtelo- only reads (Telomers are trimmed off)
-#' 5. Give trimm barcode option (length of nt to trimm..1300/30)
+#' 5. Give trim barcode option (length of nt to trimm..1300/30)
 #' 7. Create  a log file : https://cran.r-project.org/web/packages/logr/vignettes/logr.html  
 #' 8. Use the suppressMessages or suppressPackageStartupMessages(library_wich give as saving 7*7....) : https://campus.datacamp.com/courses/defensive-r-programming/early-warning-systems?ex=5
 #' 9. Use message() to show to process of work % and how much time it takes ....
@@ -916,7 +905,7 @@ global_total_length <- length(dna_reads)
 log_print(base::paste("Total reads in sample:", toString(length(dna_reads)), "\n"), hide_notes = TRUE)
 log_print("Summary statistics of the sample reads length:", hide_notes = TRUE)
 log_print(summary(width(dna_reads)), hide_notes = TRUE)
-log_print("\n", hide_notes = TRUE)
+log_print("\n",  hide_notes = TRUE)
 
 
 rc <- bool_question("Use reverse complement? (print yes/Yes or no/No)")
@@ -935,39 +924,43 @@ if(filter) {
 
 create_dirs(output_dir = args[2])
 
+if(Sys.info()[1] == "Linux"){
+  #now try parallel using future package
+  # prev cod
+  #df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = )
+  
+  
+  # now try to use future::plan(multicore, workers = 10) , I need to set the save_summary to false, and after reduce save it.
+  # also save the reads as 1 read (serian.fasta : 1.fasta ...) per file instead of reads.fasta.
+  options(future.globals.maxSize = 1048576000*1.5) # 1.5 gigabyte max
+  plan(multicore, workers = 10)
+  
+  # create indices for each worker using split 
+  
+  groups_length <- 10
+  seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
+  groups <- 1:groups_length
+  split_seq <- suppressWarnings(split(x = seq_over_length, f = groups))
+  
+  df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = 1 )
+  df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(split_seq$`1`) + 1 )
+  df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:2])) + 1)
+  df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:3])) + 1)
+  df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:4])) + 1)
+  df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:5])) + 1)
+  df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:6])) + 1)
+  df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:7])) + 1)
+  df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:8])) + 1)
+  df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:9])) + 1)
+  
+  df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9, df10))
+  # end of parallel try
+} else {
+  df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density)
+}
 
 
 
-#now try parallel using future package
-# prev cod
-#df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = dna_rc_patterns, output_dir = args[2], min_density = 0.3, serial_start = )
-
-
-# now try to use future::plan(ulticore, workers = 10) , I need to set the save_summary to false, and after reduce save it.
-# also save the reads as 1 read (serian.fasta : 1.fasta ...) per file instead of reads.fasta.
-options(future.globals.maxSize = 1048576000*1.5) # 1.5 gigabyte max
-plan(multicore, workers = 10)
-
-# create indices for each worker using split 
-
-groups_length <- 10
-seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
-groups <- 1:groups_length
-split_seq <- suppressWarnings(split(x = seq_over_length, f = groups))
-
-df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = 1 )
-df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(split_seq$`1`) + 1 )
-df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:2])) + 1)
-df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:3])) + 1)
-df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:4])) + 1)
-df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:5])) + 1)
-df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:6])) + 1)
-df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:7])) + 1)
-df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:8])) + 1)
-df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = dna_rc_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:9])) + 1)
-
-df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9, df10))
-# end of parallel try
 
 # add row number
 df_summary <- df_summary %>% 
