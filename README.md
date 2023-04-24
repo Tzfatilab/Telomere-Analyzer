@@ -1,10 +1,10 @@
 # NanoTel
 ### This program searches DNA sequences for telomeric patterns and includes 5 outputs:
- 1. A folder named **reads** containing all DNA reads possesing a telomere in separate FASTA files. 
- 2. A detailed CSV-format table named **summary** with the telomere length, location and ratio of telomeric patterns it contains for each DNA sequence.
- 3. A folder named **single_read_plots** containing plots of the telomere-pattern density throughout the DNA sequence for all sequences.
- 4. A similar folder named **single_read_plots_adj** with the same plots, all adjusted to 100 kb, aiding telomere length comparison.
- 5. A folder named **log** with summary statistics on the analysis run.
+ 1. A folder named **reads** with all telomere-containing DNA reads in separate FASTA files. 
+ 2. A detailed CSV-format table named **summary** with the telomere length, location and ratio of telomeric patterns each telomere contains for each DNA sequence.
+ 3. A folder named **single_read_plots** containing plots of the telomere-pattern density throughout the DNA sequence for all sequences, normalized to 100kb, aiding telomere length comparison.
+ 4. A similar folder named **single_read_plots_adj** with the same plots, all spread out so that the x axis contains only the DNA read length (usually under 100kb).
+ 5. A folder named **log** with summary statistics of the analysis run.
  
  Example of hypothetical plot in the *single_read_plots* folder:
 ![plot_example](https://github.com/Tzfatilab/Telomere-Analyzer/blob/main/Example/graph_example.jpeg)
@@ -36,18 +36,21 @@ Replace parameters as following:
 
 **Make sure the output_dir is not a subdirectory of input_dir or vice versa**
 
-After executing the code, a question will be asked `Use reverse complement?`. This refers to the default telomeric pattern which is searched - **CCCTAA**. Type *yes* if the desirable pattern to be searched is **TTAGGG**, otherwise type *no*.  
-A second question will be asked `Use the filtration?`. This question refers to filteration with regard the edge of the read, If your assumptaion is that each read should start/end with a telomeric pattern , than the filteration function will filter only the reads which thier edge has a telomeric pattern density.
+After executing the code, a question will be asked `Use reverse complement?`. This refers to the default telomeric pattern which is searched. If the sequenced DNA is from the C-rich strand, type *yes*, otherwise type *no*.  
+A second question will be asked `Use the filtration?`. This question refers to filteration of reads that are under 1000 nt and that have a low telomeric density at the edge of the read. Type *yes* if you want to filter, and type *yes* again after the next question if the the sequenced DNA is from the C-rich strand.
 
-### Example  
+### Example 
+`git clone https://github.com/Tzfatilab/Telomere-Analyzer.git`   
 `cd Telomere-Analyzer`  
 `Rscript --vanilla NanoTel.R Example/10_reads.fasta Example/Example_output fasta`  
-Two questions will be asked. Type `no` in both.
+Two questions will be asked. Type `no` in both.  
+Expected run time is 11 seconds.
   
 ### Changing default parameters  
 Before running the code, consider changing certain parameters in the code itself that by default have set values:
 - The telomere pattern density is searched in segments of 100 consecutive bases. This could be changed in the `global_subseq_length` parameter.
-- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the `global_min_density` parameter. This could affect where the program sets the telomere beginning.
+- Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the `global_min_density` parameter. This could affect where the program sets the telomere beginning.  
+- Currently, due to problems in purine distinction by the sequencing technology, the telomeric sequence searched is CCCTRR (R represents A or G). This could be changed under the `PATTERNS_LIST` variable.
 
   
 ### Preinstallations  
