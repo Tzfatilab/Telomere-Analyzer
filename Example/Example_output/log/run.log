@@ -1,0 +1,49 @@
+========================================================================= 
+Log Path: Example/Example_output/log/run.log 
+Program Path: /home/dudi-lab/Documents/GitHub_repositories/Telomere-Analyzer/NanoTel.R 
+Working Directory: /home/dudi-lab/Documents/GitHub_repositories/Telomere-Analyzer 
+User Name: dudi-lab 
+R Version: 4.2.2 Patched (2022-11-10 r83330) 
+Machine: dudilab-HP-EliteDesk-800-G1-TWR x86_64 
+Operating System: Linux 5.19.0-40-generic #41~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar 31 16:00:14 UTC 2 
+Base Packages: parallel stats4 stats graphics grDevices utils datasets methods base Other Packages: ggprism_1.0.4 future_1.32.0 logr_1.3.3 lubridate_1.9.2 forcats_1.0.0 stringr_1.5.0 dplyr_1.1.0 purrr_1.0.1 readr_2.1.4 tidyr_1.3.0 tibble_3.2.1 ggplot2_3.4.1 tidyverse_2.0.0 Biostrings_2.66.0 GenomeInfoDb_1.34.9 XVector_0.38.0 IRanges_2.32.0 S4Vectors_0.36.2 BiocGenerics_0.44.0 conflicted_1.2.0 
+Log Start Time: 2023-04-24 17:19:39 
+========================================================================= 
+
+Work started at: 2023-04-24 17:19:39 
+
+The input files: 
+
+Example/10_reads.fasta 
+
+Total reads in sample: 10 
+
+Summary statistics of the sample reads length: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2556    4468   15834   19180   31658   47298 
+
+ 
+
+Numer of reads which identified as Telomeric: 10 
+
+% of total reads: 100% 
+
+Summary statistics for the Telomeric reads: 
+
+reads length: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2556    4468   15834   19180   31658   47298 
+
+Telomere length: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2483    3770    7980    7372    9292   14338 
+
+Work ended at: 2023-04-24 17:19:50 
+
+========================================================================= 
+Log End Time: 2023-04-24 17:19:50 
+Log Elapsed Time: 0 00:00:11 
+========================================================================= 

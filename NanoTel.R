@@ -836,7 +836,16 @@ bool_question <- function(question) {
 
 ################## Arguments ######################################################
 
-PATTERNS_LIST <- list("CCCTRR", "CCTRRC", "CTRRCC", "TRRCCC", "RRCCCT", "RCCCTR")  
+permutate <- function(sequence){
+  sequence <- toupper(sequence)
+  patterns_list <- list()
+  for (i in 1:6){
+    patterns_list[i] <- str_c(str_sub(string = sequence, start = i, end = 6), str_sub(string = sequence, start = 1, end = i-1), sep = "")
+  }
+  return(patterns_list)
+}
+
+PATTERNS_LIST <- permutate(sequence = "CCCTRR")
 
 patterns_dna <- lapply(PATTERNS_LIST, DNAString)
 dna_rc_patterns <- lapply(patterns_dna, Biostrings::reverseComplement)
