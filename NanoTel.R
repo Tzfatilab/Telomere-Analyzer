@@ -231,22 +231,25 @@ analyze_subtelos <- function(dna_seq, patterns, sub_length,
 }
 #  a a list of (a data frame, numeric: total density) 
 
-
+# I need to put The classes as an arument ?
 #' Have to create help-functions to this function - it is too long"
 #' help_function1 : find_the_start_of_telomere
 #' help_function2: find_the_end_of_telomere
 #' end/start should both use the find first/last pattern at the edges
-#' check_edges: see if we can go forethere with the indice: using the 
+#' check_edges: see if we can go forethere with the indice: using the
 #' matchpattern with mismathes = 2 + indels.
-#' 
-find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3, 
-                        min_density_score = 2) { # 15,10 for sub_length == 20 
+#' If density < density_thr: 
+#' First check if the low density is to the right or left.
+#' Then rerun with 15,10 only to one of start/end accordingly.
+#' Should solve problems like 
+find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
+                               min_density_score = 2) { # 15,10 for sub_length == 20
   #' @title: Find the position of the Telomere(subsequence) within the seuence.
   #' @description:  Find the start and end indices of the subsequence within the
   #'  sequence according to a data frame.
-  #' @usage 
+  #' @usage
   #' @param seq_length: The length of the read.
-  #' @param subtelos: data frame of a subseuences indices, density and class 
+  #' @param subtelos: data frame of a subseuences indices, density and class
   #' (from the analyze_subtelos)
   #' @value An IRanges object of length 1.
   #' @return (start, end) irange  of the Telomere.
@@ -255,21 +258,21 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
   ###############3 NEED TO CHANGE FOR AN ARGUMENT OF classes ###################
   #' we have a problem in this function: Error in if (subt$class == classes$SKIP
   #'  | subt$class == classes$NONE |  : argument is of length zero
-  classes <- list("CCCTAA" = -5, "NONE" = 1, "SKIP" = 0)  
+  classes <- list("CCCTAA" = -5, "NONE" = 1, "SKIP" = 0)
   # set score, start, in.a.row to 0,-1,0
   
   score <- 0.0
   start <- -1
   end <- -1
   in_a_row <- 0
-  start_end_diff <- subtelos[1, "end_index"] - subtelos[1, "start_index"] 
+  start_end_diff <- subtelos[1, "end_index"] - subtelos[1, "start_index"]
   
   # loop through subsequences
   end_position <- 0 # for end loop
-  for (i in seq_len(nrow(subtelos))){ 
+  for (i in seq_len(nrow(subtelos))){
     subt <- subtelos[i, ]
     # if the subsequence's class is SKIP, NONE or NA, reset values
-    if (subt$class == classes$SKIP || subt$class == classes$NONE || 
+    if (subt$class == classes$SKIP || subt$class == classes$NONE ||
         is.na(subt$class)) {
       score <- 0
       start <- -1
@@ -282,7 +285,7 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
         start <- subt$start_index
       }
     }
-    #' if more than MIN.IN.A.ROW subtelomeres were found and the overall score 
+    #' if more than MIN.IN.A.ROW subtelomeres were found and the overall score
     #' is high enough, return start index
     if (in_a_row >= min_in_a_row && score >= min_density_score) {
       end_position <- i + 1
@@ -290,32 +293,45 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
     }
   }
   if (end_position == 0) {
-    return(IRanges(1, 1)) # no telomere was found 
+    return(IRanges(1, 1)) # no telomere was found
   }
   
   
-  #' search for end from the last subsequence (backward to finding stat incase 
+  #' search for end from the last subsequence (backward to finding stat incase
   #' there is island of non-telomeric subsequence)
-  end <- -1 
+  end <- -1
   score <- 0.0
   in_a_row <- 0
-  for (i in nrow(subtelos):end_position){ 
-    subt <- subtelos[i, ]
-    # if the subsequence's class is SKIP, NONE or NA, reset values
-    if (subt$class == classes$SKIP || subt$class == classes$NONE || 
-        is.na(subt$class)) {
-      score <- 0.0
-      end <- -1
-      in_a_row <- 0
-    }else {
-      # otherwise add one to in.a.row, update score and set start index
-      in_a_row <- in_a_row + 1
-      score <- score + subt$density
-      if (end == -1) {
-        end <- subt$end_index
+  # what if end_position >= nrow(subtelos) - min_in_a_row +1
+  if(end_position >= nrow(subtelos) - min_in_a_row +1 ) {
+    i <- nrow(subtelos)
+    subt <- subtelos[i, ] 
+    while(subt$class != classes$CCCTAA && i > end_position) {
+      i <- i-1
+      subt <- subtelos[i, ] 
+    }
+    end <- subt$end_index
+  } else {
+    for (i in nrow(subtelos):end_position){
+      subt <- subtelos[i, ]
+      # if the subsequence's class is SKIP, NONE or NA, reset values
+      if (subt$class == classes$SKIP || subt$class == classes$NONE ||
+          is.na(subt$class)) {
+        score <- 0.0
+        end <- -1
+        in_a_row <- 0
+      } else {
+        # otherwise add one to in.a.row, update score and set start index
+        in_a_row <- in_a_row + 1
+        score <- score + subt$density
+        if (end == -1) {
+          end <- subt$end_index
+        }
       }
     }
-    #' if more than MIN.IN.A.ROW subtelomeres were found and the overall score 
+    
+    
+    #' if more than MIN.IN.A.ROW subtelomeres were found and the overall score
     #' is high enough, return start index
     if (in_a_row >= min_in_a_row && score >= min_density_score) {
       break
@@ -328,6 +344,7 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
   
   return(IRanges(start = start, end = end))
 }
+
 
 # check the plot
 # I need to adjust the plot to my code
@@ -796,7 +813,7 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10, su
   
   
   logical_100 <- mclapply(X = samp_100, FUN = filter_density, 
-      patterns = dna_rc_patterns, min_density = global_min_density*0.8, mc.cores = num_of_cores) 
+      patterns = patterns, min_density = global_min_density*0.8, mc.cores = num_of_cores) 
   
   
   #test_filter2 <- samps_1000[unlist(logical_100)]
