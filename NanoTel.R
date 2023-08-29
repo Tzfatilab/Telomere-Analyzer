@@ -328,14 +328,14 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
           end <- subt$end_index
         }
       }
+      
+      #' if more than MIN.IN.A.ROW subtelomeres were found and the overall score
+      #' is high enough, return start index
+      if (in_a_row >= min_in_a_row && score >= min_density_score) {
+        break
+      }
     }
     
-    
-    #' if more than MIN.IN.A.ROW subtelomeres were found and the overall score
-    #' is high enough, return start index
-    if (in_a_row >= min_in_a_row && score >= min_density_score) {
-      break
-    }
   }
   
   if (start > end) {
