@@ -21,7 +21,7 @@
 
 ### Instructions
 
-If workig on a Linux OS, use the *NanoTel* file to run the program, otherwise use *nanotel_old.R*. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
+If workig on a Linux OS, use the *NanoTel* file to run the program, otherwise use *nanotel_old.R* from the v1.0.0-beta. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
 All other files for now are just a draft with remarks for future planning.  
 Tests were done on Ubuntu operating system version 22.04.1.
 
@@ -50,7 +50,8 @@ Expected run time is 11 seconds.
 Before running the code, consider changing certain parameters in the code itself that by default have set values:
 - The telomere pattern density is searched in segments of 100 consecutive bases. This could be changed in the `global_subseq_length` parameter.
 - Each segment is classified as potentially telomeric or not depending if it passes a minimum density threshold. Changing the existing threshold (0.3) could be done in the `global_min_density` parameter. This could affect where the program sets the telomere beginning.  
-- Currently, due to problems in purine distinction by the sequencing technology, the telomeric sequence searched is CCCTRR (R represents A or G). This could be changed under the `PATTERNS_LIST` variable.
+- The telomeric sequence searched is TTAGGG. This could be changed under the `curr_patterns` variable.
+- If you used guppy basecaller with the r9 kit it is best recommended to re-basecall with dorado due to problems in purine distinction by the sequencing technology or changing the `curr_patterns` variable to a list of "YYAGGG/CCCTRR" patterns.
 
   
 ### Preinstallations  
