@@ -21,7 +21,7 @@
 
 ### Instructions
 
-If workig on a Linux OS, use the *NanoTel* file to run the program, otherwise use *nanotel_old.R* from the v1.0.0-beta. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
+If working on a Linux OS,there is the possbility for running the code with 10 different processes runing on parallel using the future package *NanoTel-multicore-10workers* file to run the program, otherwise use *nanotel.R*. The difference between the two is the use of parallel computing in the former which speeds up the computation process and is not currently supported by Windows.  
 All other files for now are just a draft with remarks for future planning.  
 Tests were done on Ubuntu operating system version 22.04.1.
 
