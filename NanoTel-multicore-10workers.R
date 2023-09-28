@@ -24,6 +24,7 @@ library(tidyverse)
 library(IRanges)
 library(parallel)
 library(logr)
+library(future)
 library(ggprism)
 #utils::globalVariables(c("start_index"))
 
@@ -1244,8 +1245,33 @@ create_dirs(output_dir = args[2])
 # now try to use future::plan(ulticore, workers = 10) , I need to set the save_summary to false, and after reduce save it.
 # also save the reads as 1 read (serian.fasta : 1.fasta ...) per file instead of reads.fasta.
 options(future.globals.maxSize = 1048576000*1.5) # 1.5 gigabyte max
+plan(multicore, workers = 10)
 
-df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = 1 )
+# create indices for each worker using split
+
+groups_length <- 10
+seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
+if( length(seq_over_length) < groups_length) {
+  df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = 1 )
+} else {
+  
+  groups <- 1:groups_length
+  split_seq <- suppressWarnings(split(x = seq_over_length, f = groups))
+  
+  df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = 1 )
+  df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(split_seq$`1`) + 1 )
+  df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:2])) + 1)
+  df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:3])) + 1)
+  df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:4])) + 1)
+  df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:5])) + 1)
+  df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:6])) + 1)
+  df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:7])) + 1)
+  df9 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`9`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:8])) + 1)
+  df10 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`10`], pattern_list = curr_patterns, output_dir = args[2], min_density = global_min_density, serial_start = length(unlist(split_seq[1:9])) + 1)
+  
+  df_summary <- Reduce(union_all , list(df1,df2,df3, df4, df5, df6, df7, df8, df9, df10))
+  # end of parallel try
+}
 
 
 # add row number
