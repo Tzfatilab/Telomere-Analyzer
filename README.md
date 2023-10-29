@@ -3,8 +3,7 @@
  1. A folder named **reads** with all telomere-containing DNA reads in separate FASTA files. 
  2. A detailed CSV-format table named **summary** with the telomere length, location and ratio of telomeric patterns each telomere contains for each DNA sequence.
  3. A folder named **single_read_plots** containing plots of the telomere-pattern density throughout the DNA sequence for all sequences, normalized to 100kb, aiding telomere length comparison.
- 4. A similar folder named **single_read_plots_adj** with the same plots + patterns density with 1 mismatch allowed
- 5. , all spread out so that the x axis contains only the DNA read length (usually under 100kb).
+ 4. A similar folder named **single_read_plots_adj** with the same plots + patterns density with 1 mismatch allowed , all spread out so that the x axis contains only the DNA read length (usually under 100kb).
  6. A folder named **log** with summary statistics of the analysis run.
  
  Example of hypothetical plot in the *single_read_plots* folder:
