@@ -1,0 +1,53 @@
+========================================================================= 
+Log Path: /home/lab/Telomere-Analyzer/Example/Example_output/log/run.log 
+Working Directory: /home/lab/Telomere-Analyzer 
+User Name: lab 
+R Version: 4.3.1 (2023-06-16) 
+Machine: lab-HP-EliteDesk-800-G4-TWR x86_64 
+Operating System: Linux 6.2.0-35-generic #35~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Oct 6 10:23:26 UTC 2 
+Base Packages: parallel stats4 stats graphics grDevices utils datasets methods base Other Packages: optparse_1.7.3 ggprism_1.0.4 future_1.33.0 logr_1.3.4 lubridate_1.9.2 forcats_1.0.0 stringr_1.5.0 dplyr_1.1.2 purrr_1.0.2 readr_2.1.4 tidyr_1.3.0 tibble_3.2.1 ggplot2_3.4.3 tidyverse_2.0.0 Biostrings_2.68.1 GenomeInfoDb_1.36.1 XVector_0.40.0 IRanges_2.34.1 conflicted_1.2.0 S4Vectors_0.38.1 BiocGenerics_0.46.0 
+Log Start Time: 2023-10-29 11:27:21.557453 
+========================================================================= 
+
+Work started at: 2023-10-29 11:27:21.558095 
+
+The patterns to search: TTAGGG 
+
+The input files: 
+
+/home/lab/Telomere-Analyzer/Example/sample.fasta 
+
+Total reads in sample: 4 
+
+Summary statistics of the sample reads length: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2981   12655   18145   24675   30165   59430 
+
+Number of reads which identified as Telomeric: 4 
+
+% of total reads: 100% 
+
+Summary statistics for the Telomeric reads: 
+
+reads length: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2981   12655   18145   24675   30165   59430 
+
+Telomere length: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2976    6964    9226    8375   10636   12072 
+
+Telomere length with 1 mismatch allowed: 
+
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+   2981    7598    9784    8655   10840   12072 
+
+Work ended at: 2023-10-29 11:27:30.000251 
+
+========================================================================= 
+Log End Time: 2023-10-29 11:27:30.000882 
+Log Elapsed Time: 0 00:00:08 
+========================================================================= 
