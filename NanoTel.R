@@ -11,7 +11,7 @@
 #
 # Notes: Running the script on linux:
 # "Rscript --vanilla NanoTel -i input_path --save_path output_path --patterns "some patterns"
-# See Rscript --vanilla nanotel-multicore-10workers.R --help for more additional flags
+# See Rscript --vanilla NanoTel.R  --help for more additional flags
 # format can be either fasta or fastq, input_path can be either a full path for a
 # single fastq/a file or a directory containing fastq/a files.
 # Please try to give the output_path outside the input dir path and vice versa
@@ -31,14 +31,45 @@ suppressPackageStartupMessages(require(ggprism))
 suppressPackageStartupMessages(require(optparse))
 #utils::globalVariables(c("start_index"))
 
+
+
+
+#' my changes: 5.11.2023
+#' 1. Change thr for re-indexing  telomere_density < 0.85 
+#'  (telomere_density2 < 0.85) this should exclude small islands from the telo.
+#' 2. Added: print the input arguments to the log file.
+
+
+
+
+
+
+
+
+#' 3. Add option to mismatch, max_mismatch (default == 1), or fixed list of mismatches 
+
+
+
+
+
 #' TODO: replace all for loops to map with a private functio
 #' instead of for(...{if...else...} : map(x, p_function)
 #' map(numlist, ~.x %>% sqrt() %>% sin())
 
 # Last change: 16:09 4/10/2023 max-matches <- 2 (insteadof 1)
 
+#
 
-global_min_density <- 0.6
+
+
+
+
+
+
+
+
+
+global_min_density <- 0.5
 global_subseq_length <- 100
 
 
@@ -950,7 +981,7 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   #' My last change: 22/10/2023
   #' Check first the length of the telomere, before setting min_in_a_row
   num_rows <- width(telo_position) %/% global_subseq_length
-  if (telo_density < 0.7 && num_rows > 5) {
+  if (telo_density < 0.85 && num_rows > 5) {
     min_rows <- ifelse(num_rows <= 10, yes = num_rows - 2, no = 10)
     min_density <- 0.6*min_rows
     telo_position <- find_telo_position(seq_length = length(current_seq_unlist),
@@ -968,7 +999,7 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   #' My last change: 22/10/2023
   #' Check first the length of the telomere, before setting min_in_a_row
   num_rows <- width(telo_position2) %/% global_subseq_length
-  if (telo_density2 < 0.7 && num_rows > 5) {
+  if (telo_density2 < 0.85 && num_rows > 5) {
     min_rows <- ifelse(num_rows <= 10, yes = num_rows - 2, no = 10)
     min_density <- 0.6*min_rows
     telo_position2 <- find_telo_position(seq_length = length(current_seq_unlist),
@@ -1483,7 +1514,16 @@ lf <- log_open(tmp)
 t1 <- Sys.time()
 log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE) # Send message to log
 
+log_print("############### The input argumetns for this run: ################")
+if(opt$r) {
+  log_print("Reverse complement was applied on the input reads.")
+}
 log_print(base::paste("The patterns to search:", opt$patterns), hide_notes = TRUE)
+log_print(base::paste("The sub-sequence length  is:", 
+                      toString(opt$subseq_length)), hide_notes = TRUE)
+log_print(base::paste("The minimal density for a telomeric subseq:", 
+                      toString(opt$min_density)), hide_notes = TRUE)
+log_print("##################################################################")
 
 log_print("The input files:", hide_notes = TRUE)
 # add the names of the files which we analyze.
