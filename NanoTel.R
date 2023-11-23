@@ -1354,7 +1354,7 @@ run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta
     seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
     if( length(seq_over_length) < groups_length) {
       plan(sequential)
-      curr_df <- search_patterns(sample_telomeres = dna_reads, pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = 1 )
+      curr_df <- search_patterns(sample_telomeres = dna_reads, pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = serial_start )
       df_summary <- union_all(df_summary, curr_df)
     } else {
       
