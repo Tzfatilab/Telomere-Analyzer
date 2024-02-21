@@ -77,6 +77,19 @@ global_subseq_length <- 100
 #' Check: My last change : 22/10/2023
 
 
+
+# try using this code: 
+#' # Install and load the GenomicRanges package
+
+#library(GenomicRanges)
+# Set the total length and width
+#total_length <- 1000
+#width <- 100
+# Create a GRanges object
+#ranges <- GRanges(seqnames = 'chr1', ranges = IRanges(start = seq(1, total_length, width), end = seq(width, total_length, width)))
+# Print the GRanges object
+#print(ranges)
+
 split_telo <- function(dna_seq, sub_length) {
   #' @title Splits a DNA sequence into subsequences.
   #' @description This function calculate the sequence len and creates IRanges
@@ -1303,7 +1316,7 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10, su
 
 # run The future par search_pattern on small chunks inorder to save memory.
 run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta","fastq"), nrec = 10000, 
-                                      patterns, do_rc, use_filter = FALSE) {
+                                      patterns, do_rc, use_filter = FALSE, right_edge = TRUE) {
   
   if (dir.exists(input_path)) {
     filepath <- dir(full.names = TRUE, path = input_path, recursive = TRUE, include.dirs = FALSE)
@@ -1345,7 +1358,7 @@ run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta
     
     if(use_filter) {
       plan(sequential)
-      dna_reads <- filter_reads(samples = dna_reads , patterns = patterns , do_rc = FALSE, right_edge = TRUE, num_of_cores = 8)
+      dna_reads <- filter_reads(samples = dna_reads , patterns = patterns , do_rc = FALSE, right_edge = right_edge, num_of_cores = 8)
       plan(multicore, workers = 8)
       if(is.na(dna_reads[1])) {next}
     }
@@ -1466,11 +1479,14 @@ option_list = list(
   
   make_option("--subseq_length", action = "store", default = 100, 
               type = "integer", help = "The length of the sub-sequence.",
-              metavar = "Sub--sequence length." ), 
+              metavar = "Sub-sequence length." ), 
   
   make_option("--use_filter", action = "store_true", default = FALSE,
               help = "Filter reads accoding to the edge.", 
-              metavar = "USE FILTER" )
+              metavar = "USE FILTER" ), 
+  make_option("--filter_right_edge", action = "store_true", default = TRUE, 
+              help = "When using the filter function, check the start of the sequence (left) or the end of the sequence (right", 
+              metavar = "Check right or left edge for filter")
   
 )   
 opt = parse_args(OptionParser(option_list=option_list))
@@ -1545,7 +1561,7 @@ create_dirs(output_dir = opt$save_path)
   
 ans_list <- run_future_worker_chuncks(input_path = opt$i, output_path = opt$save_path, 
     format = opt$f, nrec = opt$nrec, patterns = cur_patterns, do_rc = opt$r, 
-    use_filter = opt$use_filter)
+    use_filter = opt$use_filter, right_edge = opt$filter_right_edge)
 
 global_total_length <- length(ans_list$all_reads_length_vec)
 
