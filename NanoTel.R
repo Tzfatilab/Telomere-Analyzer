@@ -1484,7 +1484,7 @@ option_list = list(
   make_option("--use_filter", action = "store_true", default = FALSE,
               help = "Filter reads accoding to the edge.", 
               metavar = "USE FILTER" ), 
-  make_option("--filter_right_edge", action = "store_true", default = TRUE, 
+  make_option("--filter_right_edge", action = "store_true", default = FALSE, 
               help = "When using the filter function, check the start of the sequence (left) or the end of the sequence (right", 
               metavar = "Check right or left edge for filter")
   
