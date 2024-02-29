@@ -5,6 +5,7 @@
  3. A folder named **single_read_plots** containing plots of the telomere-pattern density throughout the DNA sequence for all sequences, normalized to 100kb, aiding telomere length comparison.
  4. A similar folder named **single_read_plots_adj** with the same plots + patterns density with 1 mismatch allowed , all spread out so that the x axis contains only the DNA read length (usually under 100kb).
  6. A folder named **log** with summary statistics of the analysis run.
+ 7. A file named **reads_ids.txt** with the ids of the telomeric reads.
  
  Example of hypothetical plot in the *single_read_plots* folder:
 ![plot_example](https://github.com/Tzfatilab/Telomere-Analyzer/blob/main/Example/graph_example.jpeg)
@@ -31,7 +32,9 @@ Replace parameters as following:
 - NanoTel.R: path for the code file (including file name).
 - input_dir: path for the fastq/a file or directory containing fasta/fastq files.
 - output_dir: path for the output directory.
-- pattern_list: A single pattern (for example: TTAGGG) or a list of patterns(Must be in double quotes) for example: "TTAGGG TTGGG "CCAGGG".  
+- pattern_list: A single pattern (for example: TTAGGG) or a list of patterns(Must be in double quotes) for example: "TTAGGG TTGGG "CCAGGG".
+  It is possible to give a multi pattern as input for eample: "TTAGGG TCAGGG CTAGGG CCAGGG", but when it is possible we recommand to give it as a single pattern with the ambiguity letters:
+  For eample: "TTAGGG TCAGGG CTAGGG CCAGGG" should be replaced by the single pattern YYAGGG.
 
 **Make sure the output_dir is not a subdirectory of input_dir or vice versa**
 for additional available input flags: see Rscript --vanilla NanoTel.R --help
