@@ -42,6 +42,11 @@ suppressPackageStartupMessages(require(optparse))
 
 
 
+# test matchPattern with latters !in c("A", "C", "G", "T")
+
+
+
+
 
 
 
@@ -121,6 +126,44 @@ split_telo <- function(dna_seq, sub_length) {
 } # IRanges object
 
 
+# create a patterns which are create from 1 pattern using 1 
+# mismatch + the original pattern
+get_one_mismatch <- function(seq, abc = c("A", "C", "G", "T")) {
+  seq_list <- list()
+  seq_length <- str_length(seq)
+  
+  if(seq_length == 1) {
+    return(as.list(abc))
+  }
+  
+  if(seq_length == 0) {
+    return(list())
+  }
+  
+  for(i in seq_len(str_length(seq))) {
+    for(l in abc ) {
+      if(i == 1)
+        curr_seq <- str_c(l, str_sub(seq, start = 2, end = seq_length))
+      else if (i == seq_length)
+        curr_seq <- str_c(str_sub(seq, start = 1, end = seq_length - 1), l)
+      else
+        curr_seq <- str_c(str_sub(seq, start = 1 , end = i -1), l , str_sub(seq, start = i + 1, end = seq_length))
+      seq_list <- base::append(seq_list, curr_seq)
+    }
+  }
+  
+  return(seq_list)
+}
+
+
+test2 <- map(.x = list("TTAGGG", "TCAGGG", "CTAGGG", "CCAGGG"), .f = get_one_mismatch) %>% 
+  unlist() %>% 
+  unique() %>% 
+  as.list()
+
+
+
+
 
 # My last change: 15/10/2023 - use trim for out-of-bound matches"
 #' This is a feature. The matchPattern/vmatchPattern family of functions treat 
@@ -164,7 +207,7 @@ split_telo <- function(dna_seq, sub_length) {
 #calculate according to sum(width of the IRanges)
 # The calculation is on the full sequence and it is not fit for subsequences
 #' use purrr::map to replace the for loops code
-get_density_iranges <- function(sequence, patterns, fixed = TRUE, with_mismatch = FALSE) {
+get_density_iranges <- function(sequence, patterns, with_mismatch = FALSE) {
   #' @title Pattern searching function.
   #' @description: get the density of a given pattern or a total density of a
   #' list of patterns, and IRanges of the patterns.
@@ -187,12 +230,15 @@ get_density_iranges <- function(sequence, patterns, fixed = TRUE, with_mismatch 
     
     #  use map instead and do 
     for (pat in patterns){
+      #' letters that represent ambiguity which are used when more than one kind
+      #'  of nucleotide could occur at that position - than it is not fixed pattern
+      fixed <- !str_detect(string = pat, pattern = "[WSMKRYBDHVN]")
       curr_mp <- matchPattern(pattern = pat, subject =
-              unlist(sequence), max.mismatch = max_mismatch, fixed = fixed )
-      if(max_mismatch) { curr_mp <- trim(curr_mp)}
+              unlist(sequence),  fixed = fixed )
       mp_all <- IRanges::union(mp_all, curr_mp)
     }
   }else {
+    fixed <- !str_detect(string = patterns, pattern = "[WSMKRYBDHVN]")
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence),
                            max.mismatch = max_mismatch, fixed = fixed)
     if( (fixed == FALSE) || (max_mismatch > 0) ) {
@@ -290,7 +336,7 @@ get_sub_density <- function(sub_irange, ranges) {
 #'      ( see the course Foundations of Functional Programming with purrr)
 ###########3 My cahnge from prev - return a list 0f (df, total_density) ######
 analyze_subtelos <- function(dna_seq, patterns, sub_length,
-                       min_density, fixed = TRUE, with_mismatch = FALSE) {
+                       min_density, with_mismatch = FALSE) {
   # return list(subtelos, list_density_mp[1])
   #' @title Analyze the patterns for each subsequence.
   #' @description s split a dna sequence to subsequences and calculate the
@@ -306,7 +352,7 @@ analyze_subtelos <- function(dna_seq, patterns, sub_length,
   # aother option is to create 5 vector s and then make a data.table from them
 
   # density and iranges of matchPattern
-  list_density_mp <- get_density_iranges(dna_seq, patterns = patterns, fixed = fixed , with_mismatch = with_mismatch)
+  list_density_mp <- get_density_iranges(dna_seq, patterns = patterns, with_mismatch = with_mismatch)
   mp_iranges <- list_density_mp[[2]]
   # get start indexes of "subtelo"
   idx_iranges <- split_telo(dna_seq, sub_length = sub_length)
@@ -940,7 +986,7 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
 
   # returns a a list of (a data frame, list(numeric: total density,iranges))
   analyze_list <- analyze_subtelos(dna_seq = current_seq_unlist, patterns =
-                                     pattern_list, min_density = min_density, sub_length = global_subseq_length, fixed = TRUE, with_mismatch = FALSE)
+                                     pattern_list, min_density = min_density, sub_length = global_subseq_length, with_mismatch = FALSE)
   
   # I need to change the name to subseq_irange ( 1:100, 101:200 ,....)
   telo_position <- find_telo_position(seq_length = length(current_seq_unlist),
@@ -953,7 +999,7 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
 
   
   analyze_list2 <- analyze_subtelos(dna_seq = current_seq_unlist, patterns =
-                                     pattern_list, min_density = min_density, sub_length = global_subseq_length, fixed = TRUE, with_mismatch = TRUE)
+                                     pattern_list, min_density = min_density, sub_length = global_subseq_length, with_mismatch = TRUE)
   telo_position2 <- find_telo_position(seq_length = length(current_seq_unlist),
                                     subtelos = analyze_list2[[1]],
                                     min_in_a_row = 3, min_density_score = 2)
@@ -1452,7 +1498,7 @@ option_list = list(
               metavar = "output dir path"),
   
   # format( fastq/fasta)
-  make_option(c("-f","--format"), action = "store", 
+  make_option("--format", action = "store", 
               type = "character", default = "fastq" , 
               help = "input files format (Either \"fastq\" (the default) or \"fasta\", gzip is supported)", 
               metavar = "file format"),
@@ -1484,8 +1530,9 @@ option_list = list(
   make_option("--use_filter", action = "store_true", default = FALSE,
               help = "Filter reads accoding to the edge.", 
               metavar = "USE FILTER" ), 
+  
   make_option("--filter_right_edge", action = "store_true", default = FALSE, 
-              help = "When using the filter function, check the start of the sequence (left) or the end of the sequence (right", 
+              help = "When using the filter function, check the start of the sequence (left) or the end of the sequence (right), using this flag will tell the filter to check the right flag, the default will check the left edge!", 
               metavar = "Check right or left edge for filter")
   
 )   
@@ -1501,6 +1548,10 @@ if (is.null(opt$save_path)) {
 
 if (is.null(opt$i)) {
   stop("Missing required parameter:  --input_path", call.=FALSE)
+}
+
+if( is.null(opt$format)) {
+  stop("Format should be a string fastq or fasta")
 }
 
 
@@ -1558,9 +1609,10 @@ if(dir.exists(opt$i) ){
 
 create_dirs(output_dir = opt$save_path)
 
+
   
 ans_list <- run_future_worker_chuncks(input_path = opt$i, output_path = opt$save_path, 
-    format = opt$f, nrec = opt$nrec, patterns = cur_patterns, do_rc = opt$r, 
+    format = opt$format, nrec = opt$nrec, patterns = cur_patterns, do_rc = opt$r, 
     use_filter = opt$use_filter, right_edge = opt$filter_right_edge)
 
 global_total_length <- length(ans_list$all_reads_length_vec)
@@ -1573,7 +1625,7 @@ log_print(summary(ans_list$all_reads_length_vec), hide_notes = TRUE)
 
 #now try parallel using future package
 # prev cod
-#df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = curr_patterns, output_dir = args[2], min_density = 0.3, serial_start = )
+# df_summary <- search_patterns(sample_telomeres = dna_reads, pattern_list = curr_patterns, output_dir = args[2], min_density = 0.3, serial_start = )
 
 
 
@@ -1591,6 +1643,7 @@ log_print("Telomere length with 1 mismatch allowed:", hide_notes = TRUE)
 log_print(summary(ans_list$df_summary$Telomere_length_mismatch), hide_notes = TRUE)
 
 write_csv(x = ans_list$df_summary, file = file.path(opt$save_path,"summary.csv"))
+write_lines(x = ans_list$df_summary$sequence_ID  , file = file.path(opt$save_path, "reads_ids.txt"))
 t2 <- Sys.time()
 
 
