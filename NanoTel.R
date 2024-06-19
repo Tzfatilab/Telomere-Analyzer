@@ -4,7 +4,7 @@
 # Author: Dan Lichtental
 # Copyright (c) Dan Lichtental, 2022
 # Email:  dan.lichtental@mail.huji.ac.il
-# Last updated:  2023-Oct-26
+# Last updated:  2024-Jun-19
 # Script Name: Telomere pattern finder
 # Script Description: In this script we search over fastq file sequences for
 # telomeric patterns.
@@ -1108,12 +1108,13 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
                        "fasta", sep = "."),  sep = "/")
   writeXStringSet(current_seq, output_telo_fasta)
 
-  plot_single_telo(x_length = max(max_length, length(current_seq_unlist)),
-        seq_length = length(current_seq_unlist), subs =  analyze_list[[1]],
-        serial_num = current_serial, seq_start = start(telo_position),
-        seq_end = end(telo_position), save_it = TRUE, main_title = title,
-        w = 750, h = 300, output_jpegs = output_jpegs)
-
+  plot_single_telo_with_gray_area(x_length = max_length, seq_length =
+    length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],
+    serial_num = current_serial, seq_start = start(telo_position), 
+    seq_end = end(telo_position), gray_start = start(telo_position2), 
+    gray_end = end(telo_position2), save_it = TRUE, main_title = title, w = 750, 
+    h = 300, output_jpegs = output_jpegs)
+  
   plot_single_telo_with_gray_area(x_length = length(current_seq_unlist), seq_length =
     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],
     serial_num = current_serial, seq_start = start(telo_position), 
