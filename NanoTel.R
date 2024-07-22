@@ -156,10 +156,7 @@ get_one_mismatch <- function(seq, abc = c("A", "C", "G", "T")) {
 }
 
 
-test2 <- map(.x = list("TTAGGG", "TCAGGG", "CTAGGG", "CCAGGG"), .f = get_one_mismatch) %>% 
-  unlist() %>% 
-  unique() %>% 
-  as.list()
+
 
 
 
@@ -1291,9 +1288,8 @@ run_with_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
   if (is.na(samples_filtered[1])) {
     return(NA)
   }else {
-    search_patterns(samples_filtered, pattern_list = patterns, max_length =
-                  max(max(width(samples_filtered)), 150000), output_dir =
-                  output_dir, min_density = global_min_density, serial_start = serial_start)
+    search_patterns(samples_filtered, pattern_list = patterns, max_length = 1e5
+                  , output_dir =output_dir, min_density = global_min_density, serial_start = serial_start)
   }
 }
 
