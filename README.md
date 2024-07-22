@@ -62,9 +62,10 @@ additional arguments:
 
 	
 
-	Sometimes we need to add  TVR pattersns for more accurate Telomere analysis.
-
 	
+ Sometimes we need to add  TVR pattersns for more accurate Telomere analysis. (see the different between 2 plots)
+ ![plot_example](https://github.com/Tzfatilab/Telomere-Analyzer/blob/main/Example/noTVR.jpeg)
+ ![plot_example](https://github.com/Tzfatilab/Telomere-Analyzer/blob/main/Example/withTVR.jpeg)
   
 
 **Make sure the output_dir is not a subdirectory of input_dir or vice versa**
