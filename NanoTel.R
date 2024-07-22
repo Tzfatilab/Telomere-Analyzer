@@ -204,12 +204,13 @@ get_one_mismatch <- function(seq, abc = c("A", "C", "G", "T")) {
 #calculate according to sum(width of the IRanges)
 # The calculation is on the full sequence and it is not fit for subsequences
 #' use purrr::map to replace the for loops code
-get_density_iranges <- function(sequence, patterns, with_mismatch = FALSE) {
+get_density_iranges <- function(sequence, patterns, with_mismatch = FALSE, tvr_patterns = NULL) {
   #' @title Pattern searching function.
   #' @description: get the density of a given pattern or a total density of a
   #' list of patterns, and IRanges of the patterns.
   #' @param pattern: a list of patterns or a string of 1 pattern.
   #' @param sequence: DNAString object
+  #' @param tvr_patterns: Additional TVR's.(Telomeric varient repeats)
   #' @value A numeric for the total density of the pattern(patterns) in the
   #' sequences, a IRanges object of the indcies of the patterns found.
   #' @return a tuple of (density, IRanges) Total density of all the patterns in
@@ -231,10 +232,18 @@ get_density_iranges <- function(sequence, patterns, with_mismatch = FALSE) {
       #'  of nucleotide could occur at that position - than it is not fixed pattern
       fixed <- !str_detect(string = pat, pattern = "[WSMKRYBDHVN]")
       curr_mp <- matchPattern(pattern = pat, subject =
-              unlist(sequence),  fixed = fixed )
+              unlist(sequence),  fixed = fixed,  max.mismatch = max_mismatch)
+      if( (fixed == FALSE) || (max_mismatch > 0) ) {
+        curr_mp <- trim(curr_mp)
+      }
+      
       mp_all <- IRanges::union(mp_all, curr_mp)
+      
+      
     }
-  }else {
+    mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
+    
+  } else {
     fixed <- !str_detect(string = patterns, pattern = "[WSMKRYBDHVN]")
     mp_all <- matchPattern(pattern = patterns, subject = unlist(sequence),
                            max.mismatch = max_mismatch, fixed = fixed)
@@ -245,6 +254,42 @@ get_density_iranges <- function(sequence, patterns, with_mismatch = FALSE) {
     
   }
   
+  
+  # additional TVR's
+  if(!is.null(tvr_patterns)) {
+    if (is.list(tvr_patterns)) {
+      tvr_patterns <- unique(tvr_patterns)  # make sure there are no dups
+      
+      #  use map instead and do 
+      for (pat in tvr_patterns){
+        #' letters that represent ambiguity which are used when more than one kind
+        #'  of nucleotide could occur at that position - than it is not fixed pattern
+        fixed <- !str_detect(string = pat, pattern = "[WSMKRYBDHVN]")
+        curr_mp <- matchPattern(pattern = pat, subject =
+                                  unlist(sequence),  fixed = fixed )
+        if( (fixed == FALSE) || (max_mismatch > 0) ) {
+          curr_mp <- trim(curr_mp)
+        }
+        
+        mp_all <- IRanges::union(mp_all, curr_mp)
+      }
+      
+      
+      
+    mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
+    
+      
+    }else {
+      fixed <- !str_detect(string = tvr_patterns, pattern = "[WSMKRYBDHVN]")
+      mp_curr <- matchPattern(pattern = tvr_patterns, subject = unlist(sequence),
+                              fixed = fixed)
+      if( (fixed == FALSE) || (max_mismatch > 0) ) {
+        mp_curr <- trim(mp_curr)
+        mp_all <- IRanges::union(mp_all, mp_curr) # incase there are overlaps
+      }
+      mp_all <- IRanges::union(mp_all, mp_all) # incase there are overlaps
+    }
+  }
   
   total_density <- sum(width(mp_all)) / nchar(sequence)
   return(list(total_density, mp_all))
@@ -333,7 +378,7 @@ get_sub_density <- function(sub_irange, ranges) {
 #'      ( see the course Foundations of Functional Programming with purrr)
 ###########3 My cahnge from prev - return a list 0f (df, total_density) ######
 analyze_subtelos <- function(dna_seq, patterns, sub_length,
-                       min_density, with_mismatch = FALSE) {
+                       min_density, with_mismatch = FALSE, tvr_patterns = NULL) {
   # return list(subtelos, list_density_mp[1])
   #' @title Analyze the patterns for each subsequence.
   #' @description s split a dna sequence to subsequences and calculate the
@@ -349,7 +394,7 @@ analyze_subtelos <- function(dna_seq, patterns, sub_length,
   # aother option is to create 5 vector s and then make a data.table from them
 
   # density and iranges of matchPattern
-  list_density_mp <- get_density_iranges(dna_seq, patterns = patterns, with_mismatch = with_mismatch)
+  list_density_mp <- get_density_iranges(dna_seq, patterns = patterns, with_mismatch = with_mismatch, tvr_patterns)
   mp_iranges <- list_density_mp[[2]]
   # get start indexes of "subtelo"
   idx_iranges <- split_telo(dna_seq, sub_length = sub_length)
@@ -697,10 +742,10 @@ plot_single_telo_with_gray_area <- function(x_length, seq_length, subs,subs_mism
   #' @param subs_mismatch: the data frame with the mismatch
   #' @param serial_num: The serial number of the current sequence, used as the
   #' name of the file
-  #' @param seq_start: The start of the Telomere with mismatches.
-  #' @param gray_end: The end " ".
-  #' @param gray_start: The start of the Telomere with mismatches.
+  #' @param seq_start: The start of the Telomere .
   #' @param seq_end: The end " ".
+  #' @param gray_start: The start of the Telomere with mismatches.
+  #' @param gray_ends: The end " ".
   #' @param sava.it: save the file if TRE
   #' @param main_title: ad a title.
   #' @param w: width of the jpeg
@@ -825,8 +870,221 @@ plot_single_telo_with_gray_area <- function(x_length, seq_length, subs,subs_mism
   title(main = main_title, sub = sub_title, ylab = "Density")
   dev.off()
   
-}
+} # plot_single_telo_with_gray_area
 
+
+
+plot_single_telo_with_tvr <- function(x_length, seq_length, subs,subs_mismatch, subs_tvr,  serial_num, seq_start,
+         seq_end,gray_start, gray_end,tvr_start, tvr_end, save_it = TRUE, main_title = "", w = 750, h = 300,
+         output_jpegs, eps = FALSE) { # add output_jpegs as arg
+  #' @title plot the density over a sequence
+  #' @param x_length: The length of the x axis.
+  #' @param seq_length: The length of the sequence
+  #' @param subs: the data frame of subseuences from the analyze_subtelos
+  #' function
+  #' @param subs_mismatch: the data frame with the mismatch
+  #' @param  subs_tvr: The data frame with the mismatch + tvrs
+  #' @param serial_num: The serial number of the current sequence, used as the
+  #' name of the file
+  #' @param seq_start: The start of the Telomere .
+  #' @param seq_end: The end " ".
+  #' @param gray_start: The start of the Telomere with mismatches.
+  #' @param gray_end: The end " ".
+  #' @param tvr_start: The start of the Telomere with mismatches + tvrs.
+  #' @param tvr_end: The end " "
+  #' @param sava.it: save the file if TRE
+  #' @param main_title: ad a title.
+  #' @param w: width of the jpeg
+  #' @param h: height of the jpeg
+  #' @param output_jpegs: the output directory for saving the file
+  subs <- na.omit(subs)
+  # save file if specified
+  if (save_it) {
+    if (isTRUE(eps)) {
+      eps_path <- file.path(output_jpegs, paste0("read", serial_num, ".eps"))
+      setEPS()
+      #naming the eps file
+      postscript(eps_path)
+    } else {
+      jpeg_path <- file.path(output_jpegs, paste0("read", serial_num, ".jpeg"))
+      jpeg(filename = jpeg_path, width = w, height = h)
+    }
+  }
+  
+  ## for eps
+  #if(isTRUE(save_it)){
+  #  eps_path <-paste(output_jpegs, paste0('read', serial_num, '.eps'),sep='/')
+  
+  #setEPS()
+  # naming the eps file
+  #postscript(eps_path)
+  #}
+  
+  
+  # 26-07: my addition: save the csv file subs
+  #' write_csv(x = subs, file = paste(output_jpegs, paste('read', serial_num,
+  #' '.csv',sep=''), sep='/') )
+  
+  # give extra x for the legend at the topRigth
+  plot(subs$density ~ subs$start_index, type = "n", yaxt = "n", xaxt = "n",
+       ylab = "", xlab = "", ylim = c(0, 1), xlim = c(1, x_length +
+                                                        round(x_length / 4.15)))
+  # create axes
+  xpos <- seq(1, x_length, by = 1000) # I have cahnged from 0 to 1
+  axis(1, at = xpos, labels = sprintf("%.1fkb", xpos / 1000))
+  title(xlab = "Position", adj = 0)
+  axis(2, at = seq(-0.1, 1, by = 0.1), las = 2)
+  # add polygon to plot for each variant repeat.
+  # mychange: only comp_ttaggg
+  
+  # tvr 
+  suppressWarnings(polygon(y = c(0, subs_tvr$density, dplyr::last(subs_tvr$density), 0),
+                           x = c(1, subs_tvr$start_index, seq_length, seq_length), col = "orange3",
+                           lwd = 0.5))
+  
+  
+  # add the plot of the density with Mismatches
+  suppressWarnings(polygon(y = c(0, subs_mismatch$density, dplyr::last(subs_mismatch$density), 0),
+                           x = c(1, subs_mismatch$start_index, seq_length, seq_length), col = "orange",
+                           lwd = 0.5))
+  
+  
+  suppressWarnings(polygon(y = c(0, subs$density, dplyr::last(subs$density), 0),
+                           x = c(1, subs$start_index, seq_length, seq_length), col = "salmon",
+                           lwd = 0.5))
+  
+ 
+  
+  if(seq_start > -1) {
+    rect(xleft = seq_start, ybottom = -0.1, xright = seq_end, ytop = 0,
+         col = "red")
+    rect(xleft = seq_end + 1, ybottom = -0.1, xright = seq_length, ytop = 0,
+         col = "blue")
+    if (seq_start > 1) {
+      rect(xleft = 1, ybottom = -0.1, xright = seq_start, ytop = 0, col = "blue")
+    }
+    
+    
+    #  My last change: 1/10/2023
+    # I need to check if gray_start !=  -1
+    if(gray_start == -1) {
+      abline(h = 1, col = "black", lty = 2)
+      abline(h = 0, col = "black", lty = 2)
+      
+      
+      if(tvr_start == -1) {
+        legend(x = x_length, y = 1, 
+               legend = c("telomere", "gray area", "tvr" ,"sub-telomere", "Density", 
+                          "Density MM", "DensMM+TVRs" ),
+               col = c("red","yellow","yellow3","blue", "salmon", "orange", "orange3"), lty = 1, lwd = 2, 
+               cex = 1.2)
+        sub_title <- paste("Read length:", seq_length, ", Telomere length:",
+                           abs(seq_start - seq_end) + 1, ", Faild to calculate Telomere length with mismatches/tvr")
+        title(main = main_title, sub = sub_title, ylab = "Density")
+        dev.off()
+        return()
+      } # add tvr 
+      
+      if(tvr_start < seq_start) {
+        rect(xleft = tvr_start, ybottom = -0.1, xright = seq_start, ytop = 0,
+             col = "yellow3")
+      }
+      
+      if(tvr_end > seq_end) {
+        rect(xleft = seq_end, ybottom = -0.1, xright = tvr_end, ytop = 0,
+             col = "yellow3")
+      }
+      
+      legend(x = x_length, y = 1, 
+             legend = c("telomere", "gray area", "tvr" ,"sub-telomere", "Density", 
+                        "Density MM", "DensMM+TVRs" ),
+             col = c("red","yellow","yellow3","blue", "salmon", "orange", "orange3"), lty = 1, lwd = 2, 
+             cex = 1.2)
+      sub_title <- paste("Read length:", seq_length, ", Telomere length:",
+                         abs(seq_start - seq_end) + 1, ", Faild to calculate Telomere length with mismatches", "Telomere length with tvr:", abs(tvr_start - tvr_end) + 1)
+      title(main = main_title, sub = sub_title, ylab = "Density")
+      dev.off()
+      return()
+    }
+    
+    
+    
+    if(gray_start < seq_start) {
+      rect(xleft = gray_start, ybottom = -0.1, xright = seq_start, ytop = 0,
+           col = "yellow")
+    }
+    
+    if(gray_end > seq_end) {
+      rect(xleft = seq_end, ybottom = -0.1, xright = gray_end, ytop = 0,
+           col = "yellow")
+    }
+    
+    # check tvr
+    if(tvr_start != -1) {
+      if(gray_start > tvr_start) {
+        rect(xleft = tvr_start, ybottom = -0.1, xright = gray_start, ytop = 0,
+             col = "yellow3")
+      }
+      
+      if(gray_end < tvr_end) {
+        rect(xleft = gray_end, ybottom = -0.1, xright = tvr_end, ytop = 0,
+             col = "yellow3")
+      }
+    }
+    
+    
+  } else { # no telomere without mm
+    
+    rect(xleft = gray_start, ybottom = -0.1, xright = gray_end, ytop = 0,
+         col = "yellow")
+    rect(xleft = gray_end + 1, ybottom = -0.1, xright = seq_length, ytop = 0,
+         col = "blue")
+    if (gray_start > 1) {
+      rect(xleft = 1, ybottom = -0.1, xright = gray_start, ytop = 0, col = "blue")
+    }
+    
+    # check tvr
+    if(tvr_start != -1) {
+      if(gray_start > tvr_start) {
+        rect(xleft = tvr_start, ybottom = -0.1, xright = gray_start, ytop = 0,
+             col = "yellow3")
+      }
+      
+      if(gray_end < tvr_end) {
+        rect(xleft = gray_end, ybottom = -0.1, xright = tvr_end, ytop = 0,
+             col = "yellow3")
+      }
+    }
+    
+  }
+  
+  
+  abline(h = 1, col = "black", lty = 2)
+  abline(h = 0, col = "black", lty = 2)
+  legend(x = x_length, y = 1, 
+         legend = c("telomere", "gray area", "tvr", "sub-telomere", "Density", 
+                    "Density MM", "DensMM+TVRs"),
+         col = c("red","yellow", "yellow3","blue", "salmon", "orange", "orange3"), lty = 1, lwd = 2, 
+         cex = 1.2)
+  
+  # My last change : 2/10/2023 11:40
+  # incase no telo found
+  string_telo <- ifelse(seq_start == -1, yes = ", No telomere length", no = paste(", Telomere length:",
+                                                                                  abs(seq_start - seq_end) + 1))
+  
+  sub_title <- paste("Read length:", seq_length, string_telo , ", Telomere length with mismatches:", abs(gray_start - gray_end) + 1)
+  
+  if(tvr_start != -1) {
+    sub_title <- paste(sub_title, ", with mismatch+tvr:", abs(tvr_start - tvr_end) + 1 )
+  } else {
+    sub_title <- paste(sub_title, ", failed to calculate Telomere length with mismatch+tvr")
+  }
+  
+  
+  title(main = main_title, sub = sub_title, ylab = "Density")
+  dev.off()
+  
+} # plot_single_telo_with_gray_area
 
 
 
@@ -976,7 +1234,7 @@ get_accurate_start <- function(telo_start, irange_telo) {
 #' with all the reads -> reaname all the files accoding to the final df.
 #' Also make dir for each different type of plot
 analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
-                         output_dir, output_jpegs, output_jpegs_1, max_length, title) {
+                         output_dir, output_jpegs, output_jpegs_1, max_length, title, tvr_patterns ) {
   current_fastq_name <- names(current_seq)
   current_seq_unlist <- unlist(current_seq)
   #analyze_read(current_seq, pattern_list, min_density,title, output_jpegs, output_jpegs_1, max_length )
@@ -1003,6 +1261,24 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   
   irange_telo2 <- analyze_list2[[2]][[2]]
   
+  telo_position3 <- NULL
+  irange_telo3 <- NULL
+  analyze_list3 <- NULL
+  start3_acc <- NULL
+  end3_acc <- NULL
+  telo_density3 <- NULL
+  
+  # Now check with TVR's 
+  if(!is.null(tvr_patterns)) {
+    analyze_list3 <- analyze_subtelos(dna_seq = current_seq_unlist, patterns =
+                pattern_list, min_density = min_density, sub_length = global_subseq_length, with_mismatch = TRUE, tvr_patterns = tvr_patterns)
+    telo_position3 <- find_telo_position(seq_length = length(current_seq_unlist),
+                                         subtelos = analyze_list3[[1]],
+                                         min_in_a_row = 3, min_density_score = 2)
+    irange_telo3 <- analyze_list3[[2]][[2]]
+  }
+  
+  
   
 
   df <- data.frame(Serial = integer(), sequence_ID = character(),
@@ -1012,10 +1288,20 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
                    , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
                    Telomere_length_mismatch = integer() )
 
+  if(!is.null(tvr_patterns)) {
+    df <- data.frame(Serial = integer(), sequence_ID = character(),
+                     sequence_length = integer(), telo_density = double()
+                     , Telomere_start = integer(), Telomere_end = integer(),
+                     Telomere_length = integer(), telo_density_mismatch = double()
+                     , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
+                     Telomere_length_mismatch = integer(), 
+                     telo_density_mismatch_tvr = double()
+                     , Telomere_start_mismatch_tvr = integer(), Telomere_end_mismatch_tvr = integer(),
+                     Telomere_length_mismatch_tvr = integer())
+  }
   
   
-  
-  if (max(width(telo_position), width(telo_position2) )  < 100) {
+  if (max(width(telo_position), width(telo_position2) )  < 100 && is.null(tvr_patterns)) {
     df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
           , telo_density = NA, Telomere_start = NA, Telomere_end = NA,
           Telomere_length = NA, telo_density_mismatch = NA, 
@@ -1024,6 +1310,19 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
     
     return(df)
   } # not considered a Telomere
+  if(!is.null(tvr_patterns)) {
+    if (max(width(telo_position), width(telo_position2), width(telo_position3) )  < 100 ) {
+      df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
+                    , telo_density = NA, Telomere_start = NA, Telomere_end = NA,
+                    Telomere_length = NA, telo_density_mismatch = NA, 
+                    Telomere_start_mismatch = NA, Telomere_end_mismatch = NA, 
+                    Telomere_length_mismatch = NA, telo_density_mismatch_tvr = NA, 
+                    Telomere_start_mismatch_tvr = NA, Telomere_end_mismatch_tvr = NA, 
+                    Telomere_length_mismatch_tvr = NA )
+      
+      return(df)
+    } # not consid
+  }
   
   
   
@@ -1067,7 +1366,21 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
     #telo_density2 <- get_sub_density(telo_position2, analyze_list2[[2]][[2]])
   }
   
-
+  if(!is.null(tvr_patterns)) {
+    telo_density3 <- get_sub_density(telo_position3, analyze_list3[[2]][[2]])
+    num_rows <- width(telo_position3) %/% global_subseq_length
+    if (telo_density3 < 0.85 && num_rows > 5) {
+      min_rows <- ifelse(num_rows <= 10, yes = num_rows - 2, no = 10)
+      min_density <- 0.6*min_rows
+      telo_position3 <- find_telo_position(seq_length = length(current_seq_unlist),
+                                         subtelos = analyze_list3[[1]], min_in_a_row = min_rows,
+                                         min_density_score = min_density)
+    
+    #' Onc ew have the Telomere indices calculate the density of the patterns
+    #' within it's range.
+    #telo_density2 <- get_sub_density(telo_position2, analyze_list2[[2]][[2]])
+    }
+  }
   
   # I should validate start <= end
   start_acc <- get_accurate_start(telo_start = start(telo_position) , irange_telo = irange_telo)
@@ -1075,6 +1388,15 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   end_acc <- get_accurate_end(telo_end = end(telo_position), irange_telo = irange_telo)
   end2_acc <- get_accurate_end(telo_end = end(telo_position2), irange_telo = irange_telo2 )
   
+  if(!is.null(tvr_patterns)) {
+    start3_acc <- get_accurate_start(telo_start = start(telo_position3) , irange_telo = irange_telo3 )
+    end3_acc <- get_accurate_end(telo_end = end(telo_position3), irange_telo = irange_telo3 )
+    if (start3_acc > end3_acc) {
+      end3_acc <- start3_acc 
+    }
+    telo_position3 <- IRanges(start = start3_acc, end = end3_acc)
+    telo_density3 <- get_sub_density(telo_position3, analyze_list3[[2]][[2]])
+  }
   
   if (start_acc > end_acc) {
     end_acc <- start_acc 
@@ -1090,41 +1412,81 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   telo_density <- get_sub_density(telo_position, analyze_list[[2]][[2]])
   telo_density2 <- get_sub_density(telo_position2, analyze_list2[[2]][[2]])
   
-  if (max(width(telo_position),width(telo_position2)) < 100) {
+  
+  if (max(width(telo_position), width(telo_position2) )  < 100 && is.null(tvr_patterns)) {
     df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
                   , telo_density = NA, Telomere_start = NA, Telomere_end = NA,
                   Telomere_length = NA, telo_density_mismatch = NA, 
                   Telomere_start_mismatch = NA, Telomere_end_mismatch = NA, 
                   Telomere_length_mismatch = NA)
+    
+    return(df)
+  } # not considered a Telomere
+  if(!is.null(tvr_patterns)) {
+    if (max(width(telo_position), width(telo_position2), width(telo_position3) )  < 100 ) {
+      df <- add_row(df, Serial = NA, sequence_ID = NA, sequence_length = NA
+                    , telo_density = NA, Telomere_start = NA, Telomere_end = NA,
+                    Telomere_length = NA, telo_density_mismatch = NA, 
+                    Telomere_start_mismatch = NA, Telomere_end_mismatch = NA, 
+                    Telomere_length_mismatch = NA, telo_density_mismatch_tvr = NA, 
+                    Telomere_start_mismatch_tvr = NA, Telomere_end_mismatch_tvr = NA, 
+                    Telomere_length_mismatch_tvr = NA )
+      
       return(df)
-  }  # not considered a Telomere
-
+    } # not consid
+  }
   
   
   output_telo_fasta <- paste(output_dir, paste(toString(current_serial),
                        "fasta", sep = "."),  sep = "/")
   writeXStringSet(current_seq, output_telo_fasta)
 
-  plot_single_telo_with_gray_area(x_length = max_length, seq_length =
-    length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],
-    serial_num = current_serial, seq_start = start(telo_position), 
-    seq_end = end(telo_position), gray_start = start(telo_position2), 
-    gray_end = end(telo_position2), save_it = TRUE, main_title = title, w = 750, 
-    h = 300, output_jpegs = output_jpegs)
   
-  plot_single_telo_with_gray_area(x_length = length(current_seq_unlist), seq_length =
-    length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],
-    serial_num = current_serial, seq_start = start(telo_position), 
-    seq_end = end(telo_position), gray_start = start(telo_position2), 
-    gray_end = end(telo_position2), save_it = TRUE, main_title = title, w = 750, 
-    h = 300, output_jpegs = output_jpegs_1)
-
-  # eps
-  plot_single_telo_with_gray_area(x_length = length(current_seq_unlist), seq_length =
-    length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],serial_num = current_serial,
-    seq_start = start(telo_position), seq_end = end(telo_position),gray_start = start(telo_position2), 
-    gray_end = end(telo_position2) ,save_it = TRUE, main_title = title,  w = 750, 
-    h = 300,output_jpegs = output_jpegs_1, eps = TRUE)
+ if(is.null(tvr_patterns)) {
+   plot_single_telo_with_gray_area(x_length = max_length, seq_length =
+                                     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],
+                                   serial_num = current_serial, seq_start = start(telo_position), 
+                                   seq_end = end(telo_position), gray_start = start(telo_position2), 
+                                   gray_end = end(telo_position2), save_it = TRUE, main_title = title, w = 750, 
+                                   h = 300, output_jpegs = output_jpegs)
+   
+   plot_single_telo_with_gray_area(x_length = length(current_seq_unlist), seq_length =
+                                     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],
+                                   serial_num = current_serial, seq_start = start(telo_position), 
+                                   seq_end = end(telo_position), gray_start = start(telo_position2), 
+                                   gray_end = end(telo_position2), save_it = TRUE, main_title = title, w = 750, 
+                                   h = 300, output_jpegs = output_jpegs_1)
+   
+   # eps
+   plot_single_telo_with_gray_area(x_length = length(current_seq_unlist), seq_length =
+                                     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]],  serial_num = current_serial,
+                                   seq_start = start(telo_position), seq_end = end(telo_position),gray_start = start(telo_position2), 
+                                   gray_end = end(telo_position2) ,save_it = TRUE, main_title = title,  w = 750, 
+                                   h = 300,output_jpegs = output_jpegs_1, eps = TRUE)
+ } else {
+   plot_single_telo_with_tvr(x_length = max_length, seq_length =
+                                     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]], subs_tvr = analyze_list3[[1]], 
+                                   serial_num = current_serial, seq_start = start(telo_position), 
+                                   seq_end = end(telo_position), gray_start = start(telo_position2), 
+                                   gray_end = end(telo_position2),tvr_start = start(telo_position3) , tvr_end = end(telo_position3), save_it = TRUE, main_title = title, w = 750, 
+                                   h = 300, output_jpegs = output_jpegs)
+   
+   plot_single_telo_with_tvr(x_length = length(current_seq_unlist), seq_length =
+                                     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]], subs_tvr = analyze_list3[[1]],
+                                   serial_num = current_serial, seq_start = start(telo_position), 
+                                   seq_end = end(telo_position), gray_start = start(telo_position2), 
+                                   gray_end = end(telo_position2), tvr_start = start(telo_position3) , tvr_end = end(telo_position3),save_it = TRUE, main_title = title, w = 750, 
+                                   h = 300, output_jpegs = output_jpegs_1)
+   
+   # eps
+   plot_single_telo_with_tvr(x_length = length(current_seq_unlist), seq_length =
+                                     length(current_seq_unlist), subs =  analyze_list[[1]],subs_mismatch = analyze_list2[[1]], subs_tvr = analyze_list3[[1]], serial_num = current_serial,
+                                   seq_start = start(telo_position), seq_end = end(telo_position),gray_start = start(telo_position2), 
+                                   gray_end = end(telo_position2),tvr_start = start(telo_position3) , tvr_end = end(telo_position3) ,save_it = TRUE, main_title = title,  w = 750, 
+                                   h = 300,output_jpegs = output_jpegs_1, eps = TRUE)
+ }
+  
+  
 
   # check for valid telomere iranges
   telo_length <- width(telo_position)
@@ -1147,7 +1509,7 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   }
   
   
-  
+  if(is.null(tvr_patterns)) {
   df <- df %>%
     add_row(Serial = current_serial, sequence_ID = current_fastq_name,
     sequence_length = length(current_seq_unlist), telo_density = telo_density
@@ -1155,8 +1517,31 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
       telo_length, telo_density_mismatch = telo_density2, 
     Telomere_start_mismatch = telo_start2, Telomere_end_mismatch = telo_end2, 
     Telomere_length_mismatch = telo_length2)
-
+  } else {
+    
+    telo_length3 <- width(telo_position3)
+    telo_start3 <- start(telo_position3)
+    telo_end3 <- end(telo_position3)
+    if(start(telo_position3) == -1) {
+      telo_length3 <- NA
+      telo_start3 <- NA
+      telo_end3 <- NA
+      telo_density3 <- NA
+    }
+    
+    df <- df %>%
+      add_row(Serial = current_serial, sequence_ID = current_fastq_name,
+              sequence_length = length(current_seq_unlist), telo_density = telo_density
+              , Telomere_start = telo_start, Telomere_end = telo_end, Telomere_length = 
+                telo_length, telo_density_mismatch = telo_density2, 
+              Telomere_start_mismatch = telo_start2, Telomere_end_mismatch = telo_end2, 
+              Telomere_length_mismatch = telo_length2, 
+              telo_density_mismatch_tvr = telo_density3
+              , Telomere_start_mismatch_tvr = telo_start3, Telomere_end_mismatch_tvr = telo_end3,
+              Telomere_length_mismatch_tvr = telo_length3)
+  }
   return(df)
+  
 } # End of analyze_read
 
 
@@ -1183,8 +1568,7 @@ create_dirs <- function(output_dir) {
 ############## Running functions ###############################################
 
 search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
-                            output_dir, serial_start = 1,
-                           min_density,  title = "Telomeric repeat density") {
+     output_dir, serial_start = 1, min_density,  title = "Telomeric repeat density", tvr_patterns) {
   #'@title Search given Patterns over a DNA sequences.
   #'@param sample_telomeres: the DNAString Set of the reads.
   #'@param pattern_list: a list of patterns or a string of 1 pattern.
@@ -1194,7 +1578,9 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
   #'@param min_density: The minimal density of the patterns in a sequence to
   #'be consider relevant.
   #'@param title: The title for the density plots.
+  #'@param tvr_patterns : Additional patterns for TVR's.
   #'@param return: Returns a data frame of the reads.
+  
 
   # output_telo_csv <- paste(output_dir, paste(csv_name, "csv", sep = "."), sep = "/")
   # output_telo_fasta <- paste(output_dir, paste("reads", "fasta", sep = "."),  sep = "/")
@@ -1204,12 +1590,28 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
 
   #max_length <- max(width(sample_telomeres))
   #  I HAVE ADDED TLOMERE LENGTH, START @ END
+  
+  
+  
   df <- data.frame(Serial = integer(), sequence_ID = character(),
                    sequence_length = integer(), telo_density = double()
                    , Telomere_start = integer(), Telomere_end = integer(),
                    Telomere_length = integer(), telo_density_mismatch = double()
                    , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
                    Telomere_length_mismatch = integer() )
+  if(!is.null(tvr_patterns)) {
+    df <- data.frame(Serial = integer(), sequence_ID = character(),
+                     sequence_length = integer(), telo_density = double()
+                     , Telomere_start = integer(), Telomere_end = integer(),
+                     Telomere_length = integer(), telo_density_mismatch = double()
+                     , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
+                     Telomere_length_mismatch = integer(), 
+                     telo_density_mismatch_tvr = double()
+                     , Telomere_start_mismatch_tvr = integer(), Telomere_end_mismatch_tvr = integer(),
+                     Telomere_length_mismatch_tvr = integer())
+  }
+  
+  
   # add telo density : get_sub_density <- function(sub_irange, ranges){
   # For the fasta output of the reads which pass the filter
   #telomeres_dna_string_set <- DNAStringSet()
@@ -1222,7 +1624,7 @@ search_patterns <- function(sample_telomeres, pattern_list, max_length = 1e5,
     curr_df <- analyze_read(current_seq = sample_telomeres[i], current_serial =
                current_serial, pattern_list = pattern_list, min_density =
                min_density, output_dir = output_reads, output_jpegs = output_jpegs,
-               output_jpegs_1 = output_jpegs_1, max_length = max_length, title = title)
+               output_jpegs_1 = output_jpegs_1, max_length = max_length, title = title, tvr_patterns = tvr_patterns)
     # not a telomeric read
     if (is.na(curr_df[1,1])) {
       next
@@ -1268,30 +1670,6 @@ filter_density <- function(sequence, patterns, min_density = 0.18) {
 
 }
 
-run_with_filter <- function(samples,  patterns, output_dir, do_rc = TRUE,
-                                   serial_start = 1, num_of_cores = 10) {
-  #' @title: Run a search for Telomeric sequences on the reads
-  #' @description use rc to adjust for the patterns and barcode/telorette l
-  #' ocatio ( should be at the last ~ 60-70 bases), filter out reads with no
-  #'              no telomeric pattern at the edge and run search_patterns.
-  #'              We assume that the Telomeres are in the right edge, or at the
-  #'              left edge and than we make the reverse comlement.
-  #' @usage
-
-  if (!dir.exists(output_dir)) { # update  did it
-    dir.create(output_dir)
-  }
-
-  samples_filtered <- filter_reads(samples = samples, patterns = patterns,
-                      do_rc = do_rc, num_of_cores = num_of_cores)
-
-  if (is.na(samples_filtered[1])) {
-    return(NA)
-  }else {
-    search_patterns(samples_filtered, pattern_list = patterns, max_length = 1e5
-                  , output_dir =output_dir, min_density = global_min_density, serial_start = serial_start)
-  }
-}
 
 create_sample <- function(input_path, format = "fastq") {
   #' @title: Extract DA sampe from fasta/q files.
@@ -1359,7 +1737,7 @@ filter_reads <- function(samples,  patterns, do_rc = TRUE, num_of_cores = 10, su
 
 # run The future par search_pattern on small chunks inorder to save memory.
 run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta","fastq"), nrec = 10000, 
-                                      patterns, do_rc, use_filter = FALSE, right_edge = TRUE) {
+                                      patterns, do_rc, use_filter = FALSE, right_edge = TRUE, tvr_patterns) {
   
   if (dir.exists(input_path)) {
     filepath <- dir(full.names = TRUE, path = input_path, recursive = TRUE, include.dirs = FALSE)
@@ -1371,12 +1749,27 @@ run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta
   
   i <- 0
   dna_length <- integer(0)
-  df_summary <- data.frame(Serial = integer(), sequence_ID = character(),
-                           sequence_length = integer(), telo_density = double()
-                           , Telomere_start = integer(), Telomere_end = integer(),
-                           Telomere_length = integer(), telo_density_mismatch = double()
-                           , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
-                           Telomere_length_mismatch = integer() )
+  
+  if(is.null(tvr_patterns)) {
+    df_summary <- data.frame(Serial = integer(), sequence_ID = character(),
+                             sequence_length = integer(), telo_density = double()
+                             , Telomere_start = integer(), Telomere_end = integer(),
+                             Telomere_length = integer(), telo_density_mismatch = double()
+                             , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
+                             Telomere_length_mismatch = integer() )
+  } else {
+    df_summary <- data.frame(Serial = integer(), sequence_ID = character(),
+                             sequence_length = integer(), telo_density = double()
+                             , Telomere_start = integer(), Telomere_end = integer(),
+                             Telomere_length = integer(), telo_density_mismatch = double()
+                             , Telomere_start_mismatch = integer(), Telomere_end_mismatch = integer(),
+                             Telomere_length_mismatch = integer(), 
+                             
+                             telo_density_mismatch_tvr = double()
+                             , Telomere_start_mismatch_tvr = integer(), Telomere_end_mismatch_tvr = integer(),
+                             Telomere_length_mismatch_tvr = integer() )
+  }
+  
   
   options(future.globals.maxSize = 1048576000*1.5) # 1.5 gigabyte max
   plan(multicore, workers = 8)
@@ -1410,21 +1803,21 @@ run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta
     seq_over_length <- seq.int(from = 1, by = 1, length.out = length(dna_reads))
     if( length(seq_over_length) < groups_length) {
       plan(sequential)
-      curr_df <- search_patterns(sample_telomeres = dna_reads, pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = serial_start )
+      curr_df <- search_patterns(sample_telomeres = dna_reads, pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = serial_start , tvr_patterns = tvr_patterns)
       df_summary <- union_all(df_summary, curr_df)
     } else {
       
       groups <- 1:groups_length
       split_seq <- suppressWarnings(split(x = seq_over_length, f = groups))
       
-      df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = serial_start )
-      df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(split_seq$`1`) + serial_start )
-      df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:2])) + serial_start)
-      df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:3])) + serial_start)
-      df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:4])) + serial_start)
-      df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:5])) + serial_start)
-      df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:6])) + serial_start)
-      df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:7])) + serial_start)
+      df1 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`1`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = serial_start, tvr_patterns = tvr_patterns )
+      df2 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`2`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(split_seq$`1`) + serial_start , tvr_patterns = tvr_patterns)
+      df3 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`3`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:2])) + serial_start, tvr_patterns = tvr_patterns)
+      df4 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`4`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:3])) + serial_start, tvr_patterns = tvr_patterns)
+      df5 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`5`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:4])) + serial_start, tvr_patterns = tvr_patterns)
+      df6 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`6`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:5])) + serial_start, tvr_patterns = tvr_patterns)
+      df7 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`7`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:6])) + serial_start, tvr_patterns = tvr_patterns)
+      df8 %<-% search_patterns(sample_telomeres = dna_reads[split_seq$`8`], pattern_list = patterns, output_dir = output_path, min_density = global_min_density, serial_start = length(unlist(split_seq[1:7])) + serial_start, tvr_patterns = tvr_patterns)
       
       df_summary <- Reduce(union_all , list(df_summary, df1,df2,df3, df4, df5, df6, df7, df8))
       # end of parallel try
@@ -1482,6 +1875,7 @@ global_min_density <- 0.6
 global_subseq_length <- 100
 
 
+
 option_list = list(
   
   # input_path
@@ -1530,7 +1924,10 @@ option_list = list(
   
   make_option("--filter_right_edge", action = "store_true", default = FALSE, 
               help = "When using the filter function, check the start of the sequence (left) or the end of the sequence (right), using this flag will tell the filter to check the right flag, the default will check the left edge!", 
-              metavar = "Check right or left edge for filter")
+              metavar = "Check right or left edge for filter"), 
+  make_option("--tvr_patterns", action = "store", default = NULL, type = "character", 
+              help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
+              metavar = " Telomere variant repeats patterns")
   
 )   
 opt = parse_args(OptionParser(option_list=option_list))
@@ -1557,6 +1954,14 @@ extract_patterns <- compose(unlist, partial(str_split, pattern = "\\s+") )
 cur_patterns <- extract_patterns(opt$patterns)
 if(length(cur_patterns) > 1) {
   cur_patterns <- as.list(cur_patterns)
+}
+
+cur_tvr_patterns <- NULL
+if(!is.null(opt$tvr_patterns)) {
+  cur_tvr_patterns <- extract_patterns(opt$tvr_patterns)
+  if(length(cur_tvr_patterns) > 1) {
+    cur_tvr_patterns <- as.list(cur_tvr_patterns)
+  }
 }
 
 
@@ -1587,6 +1992,13 @@ log_print(base::paste("The sub-sequence length  is:",
                       toString(opt$subseq_length)), hide_notes = TRUE)
 log_print(base::paste("The minimal density for a telomeric subseq:", 
                       toString(opt$min_density)), hide_notes = TRUE)
+
+if(!is.null(cur_tvr_patterns) ) {
+  log_print(base::paste("Additional Telomere variant repeats patterns were added:", 
+                        opt$tvr_patterns), hide_notes = TRUE)
+}
+
+
 log_print("##################################################################")
 
 log_print("The input files:", hide_notes = TRUE)
@@ -1610,7 +2022,7 @@ create_dirs(output_dir = opt$save_path)
   
 ans_list <- run_future_worker_chuncks(input_path = opt$i, output_path = opt$save_path, 
     format = opt$format, nrec = opt$nrec, patterns = cur_patterns, do_rc = opt$r, 
-    use_filter = opt$use_filter, right_edge = opt$filter_right_edge)
+    use_filter = opt$use_filter, right_edge = opt$filter_right_edge, tvr_patterns = cur_tvr_patterns)
 
 global_total_length <- length(ans_list$all_reads_length_vec)
 
@@ -1638,6 +2050,13 @@ log_print(summary(ans_list$df_summary$Telomere_length), hide_notes = TRUE)
 
 log_print("Telomere length with 1 mismatch allowed:", hide_notes = TRUE)
 log_print(summary(ans_list$df_summary$Telomere_length_mismatch), hide_notes = TRUE)
+
+
+if(!is.null(cur_tvr_patterns)) {
+  log_print('Telomere length with 1 mismatch allowed + tvr patterns.:', hide_notes = TRUE)
+  log_print(summary(ans_list$df_summary$Telomere_length_mismatch_tvr), hide_notes = TRUE)
+}
+
 
 write_csv(x = ans_list$df_summary, file = file.path(opt$save_path,"summary.csv"))
 write_lines(x = ans_list$df_summary$sequence_ID  , file = file.path(opt$save_path, "reads_ids.txt"))
