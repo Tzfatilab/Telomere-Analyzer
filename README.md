@@ -35,6 +35,37 @@ Replace parameters as following:
 - pattern_list: A single pattern (for example: TTAGGG) or a list of patterns(Must be in double quotes) for example: "TTAGGG TTGGG "CCAGGG".
   It is possible to give a multi pattern as input for eample: "TTAGGG TCAGGG CTAGGG CCAGGG", but when it is possible we recommand to give it as a single pattern with the ambiguity letters:
   For eample: "TTAGGG TCAGGG CTAGGG CCAGGG" should be replaced by the single pattern YYAGGG.
+additional arguments: 
+--format=FILE FORMAT
+		input files format (Either "fastq" (the default) or "fasta", gzip is supported)
+
+-n NREC, --nrec=NREC
+		Single integer. The maximum of number of records to read in to memory for each iteration. Negative values are ignored.
+
+	-r, --rc
+		Should we do reverse complement on the given reads.
+	
+--min_density=MINIMAL DENSITY.
+		Minimal density to consider a subsequence as a pattern region.
+	
+--subseq_length=SUB-SEQUENCE LENGTH.
+		The length of the sub-sequence.
+	
+--use_filter
+		Filter reads accoding to the edge.
+	
+--filter_right_edge
+		When using the filter function, check the start of the sequence (left) or the end of the sequence (right), using this flag will tell the filter to check the right flag, the default will check the left edge!
+
+	--tvr_patterns= TELOMERE VARIANT REPEATS PATTERNS
+		Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.
+
+	
+
+	Sometimes we need to add  TVR pattersns for more accurate Telomere analysis.
+
+	
+  
 
 **Make sure the output_dir is not a subdirectory of input_dir or vice versa**
 for additional available input flags: see Rscript --vanilla NanoTel.R --help
