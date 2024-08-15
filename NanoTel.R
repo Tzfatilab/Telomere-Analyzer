@@ -29,6 +29,8 @@ suppressPackageStartupMessages(require(logr))
 suppressPackageStartupMessages(require(future))
 suppressPackageStartupMessages(require(ggprism))
 suppressPackageStartupMessages(require(optparse))
+suppressPackageStartupMessages(require(testit))
+
 #utils::globalVariables(c("start_index"))
 
 
@@ -76,7 +78,7 @@ suppressPackageStartupMessages(require(optparse))
 
 global_min_density <- 0.5
 global_subseq_length <- 100
-
+global_NanoTel_Version <- "v1.1.2-beta"
 
 #' bug fix of faild calculating the telomere indcies after re-telo_position:
 #' Check: My last change : 22/10/2023
@@ -365,6 +367,242 @@ get_sub_density <- function(sub_irange, ranges) {
   #' subsequence
   return(sum(width(IRanges::intersect(sub_irange, ranges))) / width(sub_irange))
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# I Can merge the 2 functions to 1 with additional paramater which tells me to return start or end index?
+# ' Helper for search_left_patterns
+#' I need to think about a pattern which is a list of patterns
+#' -> return an start index ( maximal end index)
+#' We assume patterns is a list of strings.
+#' @param read - A dna seq DNAString
+#' @param patterns - A list of Strings , each represen a pattern
+#' @param subseq_start - Index for the start of the subsequence we want to check.
+#' @param subseq_end - "               end ".
+#' @param with_mismatches - If True, allow 1 mismatch.
+#' @tvr_patterns - Additional patterns to check, with no mismatch for them.
+#' @returns  - New index, or Inf if there is no updated start index.
+multi_pattern_step_left <- function(read,patterns, subseq_start, subseq_end, with_mismatches = FALSE, tvr_patterns = NULL) {
+  new_start <- Inf
+  
+  if( (is.null(tvr_patterns) || with_mismatches) == FALSE ) { # FF
+    all_patterns <- unique(unlist(list(patterns, tvr_patterns)))
+    for(pat in all_patterns) {
+      curr_mp <- matchPattern(pattern = pat, subject = subseq(read, start = subseq_start, end = subseq_end ) )
+      if(length(curr_mp) > 0) {
+        new_start <- min(new_start, min(start(curr_mp)))
+      }
+    }
+    
+    return(ifelse(new_start == Inf, new_start , as.integer(new_start + subseq_start - 1)) )
+  }
+  
+  for(pat in patterns) {
+    curr_mp <- matchPattern(pattern = pat, subject = subseq(read, start = subseq_start, end = subseq_end), max.mismatch = as.numeric(with_mismatches) ) 
+    if(length(curr_mp) > 0) {
+      new_start <- min(new_start, min(start(curr_mp)))
+    }
+  }
+  if(!is.null(tvr_patterns)) {
+    for(pat in tvr_patterns) {
+      curr_mp <- matchPattern(pattern = pat, subject = subseq(read, start = subseq_start, end = subseq_end) )
+      if(length(curr_mp) > 0) {
+        new_start <- min(new_start, min(start(curr_mp)))
+      }
+    }
+    
+  }  
+  
+  return(ifelse(new_start == Inf, new_start , as.integer(new_start + subseq_start - 1)) )
+}
+
+
+
+######## Helper functions for more accurate telomere length ##############
+
+
+#' I need to think about a pattern which is a list of patterns
+#' -> return an end index ( maximal end index)
+#' We assume patterns is a list of strings.
+#' @param read - A dna seq DNAString
+#' @param patterns - A list of Strings , each represen a pattern
+#' @param subseq_start - Index for the start of the subsequence we want to check.
+#' @param subseq_end - "               end ".
+#' @param with_mismatches - If True, allow 1 mismatch.
+#' @tvr_patterns - Additional patterns to check, with no mismatch for them.
+multi_pattern_step_right <- function(read,patterns, subseq_start, subseq_end, with_mismatches = FALSE, tvr_patterns = NULL) {
+  new_end <- -1
+  if( (is.null(tvr_patterns) || with_mismatches) == FALSE ) { # FF
+    all_patterns <- unique(unlist(list(patterns, tvr_patterns)))
+    for(pat in all_patterns) {
+      curr_mp <- matchPattern(pattern = pat, subject = subseq(read, start = subseq_start, end = subseq_end ) )
+      if(length(curr_mp) > 0) {
+        new_end <- max(new_end,max(end(curr_mp)))
+      }
+    }
+    
+    return(ifelse(new_end == -1, new_end, new_end + subseq_start - 1) )
+  }
+  
+  for(pat in patterns) {
+    curr_mp <- matchPattern(pattern = pat, subject = subseq(read, start = subseq_start, end = subseq_end), max.mismatch = as.numeric(with_mismatches) ) 
+    if(length(curr_mp) > 0) {
+      new_end <- max(new_end,max(end(curr_mp)))
+    }
+  }
+  if(!is.null(tvr_patterns)) {
+    for(pat in tvr_patterns) {
+      curr_mp <- matchPattern(pattern = pat, subject = subseq(read, start = subseq_start, end = subseq_end) )
+      if(length(curr_mp) > 0) {
+        new_end <- max(new_end,max(end(curr_mp)))
+      }
+    }
+    
+  }  
+  
+  return(ifelse(new_end == -1, new_end, new_end + subseq_start - 1) )
+}
+search_left_patterns <- function(read, start_index, subseq_width = 18, step_size = 10, max_steps = 4, pattern , with_mismatch = FALSE, tvr_patterns = NULL) {
+  #' This function advance to the left to find more patterns for more accurate 
+  #' start index.
+  #' @param read - A dna seq
+  #' @param start_index - the index to start from
+  #' @param subseq_width - The length of the subseq each time we search.
+  #' @param step_size - The step for the subseq each time we move more to the left.
+  #' @param max_steps - How many iterations.
+  #' @param  pattern - The dna pattern to serach (a single string)
+  #' @param tvr_patterns - As with right...
+  #' @param with_mismatch - If TRUE allow 1 mismatch.
+  
+  
+  assert("Subsequence lengt is not smaller than the Pattern length!", str_length(pattern) <= subseq_width)
+  #  I need to set boundary checks: length(pattern) < subseq_width ....
+  subseq_start <- max(start_index - subseq_width, 1)
+  new_start <- start_index
+  for( i in 1:max_steps) {
+    curr_end <- min(subseq_start + subseq_width - 1, length(read)) # make sure no out of boundry
+    
+    if(is.list(pattern) ) {
+      # max for incase returns Inf
+      curr_start <- multi_pattern_step_left(read = read, patterns = pattern, 
+                                            subseq_start = subseq_start, subseq_end = curr_end, 
+                                            with_mismatches = as.numeric(with_mismatch), 
+                                            tvr_patterns = tvr_patterns )
+      if(curr_start == Inf) { break }
+      new_start <- curr_start
+      
+    } else {
+      if(!is.null(tvr_patterns)) {
+        curr_start <- multi_pattern_step_left(read = read, patterns = as.list(pattern), 
+                                              subseq_start = subseq_start, subseq_end = curr_end, 
+                                              with_mismatches = with_mismatch, tvr_patterns = tvr_patterns)
+        if(curr_start == Inf) { break }
+        new_start <- curr_start
+        
+      } else { #No list, no TVR's
+        curr_mp <- matchPattern(pattern = pattern, 
+                                subject = subseq(read, start = subseq_start, end = curr_end), 
+                                max.mismatch = as.numeric(with_mismatch) )
+        if(length(curr_mp) == 0) { 
+          break
+        }
+        new_start <- min(start(curr_mp)) + subseq_start - 1
+        
+      } # End of No list, no TVR's
+    }
+    
+    
+    # iteration part
+    subseq_start_new <- max(subseq_start - step_size +1, 1) # check boundry
+    if(subseq_start_new == subseq_start) {break} # we already checked it!
+    subseq_start <- subseq_start_new
+  }
+  return(new_start)
+  
+}
+
+search_right_patterns <- function(read, end_index, subseq_width = 18, step_size = 10, max_steps = 4, pattern , with_mismatch = FALSE, tvr_patterns = NULL) {
+  #' This function advance to the left to find more patterns for more accurate 
+  #' end index.
+  #' @param read - A dna seq DNAString
+  #' @param end_index - the index to the end to start from.
+  #' @param subseq_width - The length of the subseq each time we search.
+  #' @param step_size - The step for the subseq each time we move more to the left.
+  #' @param max_steps - How many iterations.
+  #' @param  pattern - The dna pattern to serach (a single string)
+  #' @param with_mismatch - If TRUE allow 1 mismatch.
+  
+  
+  assert("Subsequence length is not smaller than the Pattern length!", str_length(pattern) <= subseq_width)
+  # avvoid of limit (end_index > length(read))
+  subseq_end <- min(end_index + subseq_width, length(read))
+  new_end <- end_index
+  for( i in 1:max_steps) {
+    # avoid of limit start index (<= 1)
+    curr_start <- max(subseq_end - subseq_width + 1, 1)
+    
+    if(is.list(pattern) ) {
+      # max for incase returns -1
+      curr_end <- multi_pattern_step_right(read = read, patterns = pattern, 
+                                           subseq_start = curr_start, subseq_end = subseq_end, 
+                                           with_mismatches = with_mismatch, tvr_patterns = tvr_patterns)
+      if(curr_end == -1) { break}
+      new_end <- curr_end
+      
+      
+      
+      
+    } else{
+      if(!is.null(tvr_patterns)) {
+        curr_end <- multi_pattern_step_right(read = read, patterns = as.list(pattern),
+                                             subseq_start = curr_start, subseq_end = subseq_end, 
+                                             with_mismatches = with_mismatch, tvr_patterns = tvr_patterns) 
+        if(curr_end == -1) { break}
+        new_end <- curr_end
+        
+        
+      } else {
+        curr_mp <- matchPattern(pattern = pattern, 
+                                subject = subseq(read, start = curr_start, end = subseq_end ), 
+                                max.mismatch = as.numeric(with_mismatch) )
+        
+        if(length(curr_mp) == 0) { 
+          break
+        }
+        new_end <- max(end(curr_mp)) + curr_start - 1 #  adjust index to the full length read
+        
+        
+        
+      } 
+    }
+    # iteration part
+    # avvoid of limit (end_index > length(read))
+    subseq_end_new <- min(subseq_end + step_size +1, length(read))
+    if(subseq_end_new == subseq_end) { break}
+    subseq_end <- subseq_end_new
+  }
+  return(new_end)
+  
+}
+
+
+
+######## End of Helper functions for more accurate telomere length ##############
+
+
+
 
 
 
@@ -740,7 +978,7 @@ find_telo_position <- function(seq_length, subtelos, min_in_a_row = 3,
 }
 
 # if right_edge is false then we check left edge instead
-find_telo_position_wraper <- function(seq_length, subtelos, analyze_list,right_edge = FALSE) {
+find_telo_position_wraper <- function(read, patterns, with_mismatch, tvr_patterns, seq_length, subtelos, analyze_list,right_edge = FALSE) {
   
   
   # I need to change the name to subseq_irange ( 1:100, 101:200 ,....)
@@ -797,6 +1035,22 @@ find_telo_position_wraper <- function(seq_length, subtelos, analyze_list,right_e
       telo_position <- find_left_telo(seq_length = seq_length, subtelos = subtelos)
     }
   }
+  
+  # new args: read, patterns, with_mismatch, tvr_patterns
+  # use match pattern steps for more accurate results 
+  if(end(telo_position) < length(read)) {
+    end_acc <- search_right_patterns(read = read , end_index = end(telo_position) + 1, pattern = patterns , with_mismatch = with_mismatch, tvr_patterns = tvr_patterns)
+  } else {
+    end_acc <- end(telo_position) 
+  }
+  if(start(telo_position) > 1) {
+    start_acc  <- search_left_patterns(read = read, start_index = start(telo_position) -1 , pattern =  patterns, with_mismatch = with_mismatch, tvr_patterns = tvr_patterns)
+  } else {
+    start_acc <- start(telo_position)
+  }
+  
+  
+  telo_position <- IRanges(start = start_acc, end = end_acc)
   
   return (telo_position)
 }
@@ -1429,9 +1683,9 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
                                      pattern_list, min_density = min_density, sub_length = global_subseq_length, with_mismatch = FALSE)
   
   
-  
+  # new args: read, patterns, with_mismatch, tvr_patterns
     # I need to change the name to subseq_irange ( 1:100, 101:200 ,....)
-  telo_position <- find_telo_position_wraper(seq_length = length(current_seq_unlist), subtelos = analyze_list[[1]], analyze_list = analyze_list , right_edge = right_edge)  
+  telo_position <- find_telo_position_wraper(read = current_seq_unlist, patterns = pattern_list,with_mismatch = FALSE, tvr_patterns = NULL, seq_length = length(current_seq_unlist), subtelos = analyze_list[[1]], analyze_list = analyze_list , right_edge = right_edge)  
     
   
   
@@ -1439,7 +1693,8 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   analyze_list2 <- analyze_subtelos(dna_seq = current_seq_unlist, patterns =
                                      pattern_list, min_density = min_density, sub_length = global_subseq_length, with_mismatch = TRUE)
   
-  telo_position2 <- find_telo_position_wraper(seq_length = length(current_seq_unlist), subtelos = analyze_list2[[1]], analyze_list = analyze_list2, right_edge = right_edge)
+  telo_position2 <- find_telo_position_wraper(read = current_seq_unlist, patterns = pattern_list,with_mismatch = TRUE, tvr_patterns = NULL
+    , seq_length = length(current_seq_unlist), subtelos = analyze_list2[[1]], analyze_list = analyze_list2, right_edge = right_edge)
   
   
   
@@ -1454,7 +1709,8 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
   if(!is.null(tvr_patterns)) {
     analyze_list3 <- analyze_subtelos(dna_seq = current_seq_unlist, patterns =
                 pattern_list, min_density = min_density, sub_length = global_subseq_length, with_mismatch = TRUE, tvr_patterns = tvr_patterns)
-    telo_position3 <- find_telo_position_wraper(seq_length = length(current_seq_unlist), subtelos = analyze_list3[[1]], analyze_list = analyze_list3, right_edge = right_edge )
+    telo_position3 <- find_telo_position_wraper(read = current_seq_unlist, patterns = pattern_list, with_mismatch = TRUE, tvr_patterns = tvr_patterns,
+                                                seq_length = length(current_seq_unlist), subtelos = analyze_list3[[1]], analyze_list = analyze_list3, right_edge = right_edge )
     
    
   }
@@ -1954,6 +2210,9 @@ global_subseq_length <- 100
 
 
 option_list = list(
+  # version 
+  make_option(c("--version"), action = "store_true", 
+              default = FALSE , help = "Print the Version of the script.", metavar = "version"),
   
   # input_path
   make_option(c("-i","--input_path"), action = "store", type = "character" , 
@@ -2002,12 +2261,18 @@ option_list = list(
   make_option("--check_right_edge", action = "store_true", default = FALSE, 
               help = "This flag tells us the expected telomere position: helps with the filter and telo_position accuracy", 
               metavar = "Check right or left edge for filter and position"), 
+  
   make_option("--tvr_patterns", action = "store", default = NULL, type = "character", 
               help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
               metavar = " Telomere variant repeats patterns")
   
 )   
 opt = parse_args(OptionParser(option_list=option_list))
+
+if(isTRUE(opt$version)) {
+  cat(paste("Version:", global_NanoTel_Version, "\n"))
+  quit(save = "no", runLast = FALSE)
+}
 
 if(is.null(opt$patterns)) {
   stop("Missing required parameter:  --patterns", call.=FALSE)
@@ -2056,7 +2321,7 @@ tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
 lf <- log_open(tmp)
-
+log_print(base::paste("NanoTel Version: ", global_NanoTel_Version), hide_notes = TRUE) # Send message to log
 t1 <- Sys.time()
 log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE) # Send message to log
 
