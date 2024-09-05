@@ -78,7 +78,7 @@ suppressPackageStartupMessages(require(testit))
 
 global_min_density <- 0.5
 global_subseq_length <- 100
-global_NanoTel_Version <- "v1.1.2-beta"
+global_NanoTel_Version <- "v1.1.3-beta-2024-Sep-05"
 
 #' bug fix of faild calculating the telomere indcies after re-telo_position:
 #' Check: My last change : 22/10/2023
@@ -1003,7 +1003,7 @@ find_telo_position_wraper <- function(read, patterns, with_mismatch, tvr_pattern
   #' Check first the length of the telomere, before setting min_in_a_row
   num_rows <- width(telo_position) %/% global_subseq_length
   if (telo_density < 0.85 && num_rows > 5) {
-    min_rows <- ifelse(num_rows <= 10, yes = num_rows - 2, no = 10)
+    min_rows <- ifelse(num_rows <= 7, yes = num_rows - 2, no = 7)
     min_density <- 0.6*min_rows
     telo_position <- find_telo_position(seq_length = length(current_seq_unlist),
                                         subtelos = analyze_list[[1]], min_in_a_row = min_rows,
@@ -2210,9 +2210,6 @@ global_subseq_length <- 100
 
 
 option_list = list(
-  # version 
-  make_option(c("--version"), action = "store_true", 
-              default = FALSE , help = "Print the Version of the script.", metavar = "version"),
   
   # input_path
   make_option(c("-i","--input_path"), action = "store", type = "character" , 
@@ -2261,18 +2258,12 @@ option_list = list(
   make_option("--check_right_edge", action = "store_true", default = FALSE, 
               help = "This flag tells us the expected telomere position: helps with the filter and telo_position accuracy", 
               metavar = "Check right or left edge for filter and position"), 
-  
   make_option("--tvr_patterns", action = "store", default = NULL, type = "character", 
               help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
               metavar = " Telomere variant repeats patterns")
   
 )   
 opt = parse_args(OptionParser(option_list=option_list))
-
-if(isTRUE(opt$version)) {
-  cat(paste("Version:", global_NanoTel_Version, "\n"))
-  quit(save = "no", runLast = FALSE)
-}
 
 if(is.null(opt$patterns)) {
   stop("Missing required parameter:  --patterns", call.=FALSE)
