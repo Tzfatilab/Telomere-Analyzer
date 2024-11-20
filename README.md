@@ -55,7 +55,7 @@ Replace parameters as following:
 --use_filter
 	Filter reads accoding to the edge.
 	
---filter_right_edge
+--check_right_edge
 	When using the filter function, check the start of the sequence (left) or the end of the sequence (right), using this flag will tell the filter to check the right flag, the default will check the left edge!
 
 --tvr_patterns= TELOMERE VARIANT REPEATS PATTERNS
