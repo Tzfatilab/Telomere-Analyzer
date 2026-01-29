@@ -1768,10 +1768,10 @@ analyze_read <- function(current_seq, current_serial, pattern_list, min_density,
     } # not consid
   }
   
-  
+  # changed to compressed file: 2026-01-29
   output_telo_fasta <- paste(output_dir, paste(toString(current_serial),
-                       "fasta", sep = "."),  sep = "/")
-  writeXStringSet(current_seq, output_telo_fasta)
+                       "fasta.gz", sep = "."),  sep = "/")
+  writeXStringSet(current_seq, output_telo_fasta, compress = TRUE)
 
   
  if(is.null(tvr_patterns)) {
