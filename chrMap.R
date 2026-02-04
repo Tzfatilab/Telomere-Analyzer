@@ -1,3 +1,6 @@
+#!/usr/bin/env Rscript
+
+
 # Given nanotel output + minimap2 dorado summaryfile -> extract filter with a
 # dir for the mapped
 
@@ -168,7 +171,7 @@ df_telo <- read_csv(file = nanotel_summary_path, col_types = "icidiiidiiidiii")
 # change to new col : read_id
 df_telo$read_id <- str_sub(string = df_telo$sequence_ID, start = 1, end = 36)
 
-minimap_path
+minimap_path <- "~/Desktop/minknow_runs/T83/sequencing_summary.tsv"
 
 # Process chunks with a function
 process_chunk <- function(chunk, pos) {
@@ -219,7 +222,15 @@ join_df <- function(nanotel_summary_path, minimap_path){
   df_minimap <- read_tsv_chunked(minimap_path, 
                                  DataFrameCallback$new(process_chunk),
                                  chunk_size = 10000, col_types = col_types) %>% 
-    select(col_names)
+    select(all_of( col_names))
+  
+  # adjust index fro R ( start <- start + 1)
+  df_minimap$alignment_genome_start <- case_when(
+    df_minimap$alignment_genome_start == -1 ~ -1,
+    .default = df_minimap$alignment_genome_start + 1 )
+  df_minimap$alignment_strand_start <- case_when(
+    df_minimap$alignment_strand_start == -1 ~ -1, 
+    .default = df_minimap$alignment_strand_start + 1 )
   
   df_join <- full_join(x = df_telo, y = df_minimap, by = "read_id")
   
@@ -230,22 +241,22 @@ join_df <- function(nanotel_summary_path, minimap_path){
 df_join <- join_df(nanotel_summary_path = nanotel_summary_path, minimap_path = minimap_path)
 # add 
 
-
+df_join2 <- join_df(nanotel_summary_path = nanotel_summary_path, minimap_path = minimap_path)
 
 # add summary to log file ....
 
 
 # optional filterations:
 #' 1.  alignment_genome != '*' This is must filter 
-#' 2.  alignment_direction
-#' 3.  alignment_genome_start
-#' 4.  alignment_genome_end
-#' 5.  alignment_strand_start
-#' 6.  alignment_strand_end 
-#' 7.  alignment_identity
-#' 8.  alignment_accuracy
-#' 9.  alignment_coverage
-#' 10. alignment_mapping_quality
+#' 2.  alignment_direction     v
+#' 3.  alignment_genome_start  v
+#' 4.  alignment_genome_end    v
+#' 5.  alignment_strand_start  x
+#' 6.  alignment_strand_end    x
+#' 7.  alignment_identity      [0,1] - do not use 
+#' 8.  alignment_accuracy      v [0,1]
+#' 9.  alignment_coverage :    v ( claculate sub-telo coverage and see if it is ~ alignment_coverage(alignment_coverage = (aligned length of query) / (total query length) × 100)
+#' 10. alignment_mapping_quality v [0,60] int 
 
 filter_alignment <- function(df_join, )
 
@@ -280,70 +291,159 @@ option_list = list(
               help = "A path to a directory for storing the output files.", 
               metavar = "output dir path"),
   
-  make_option("--filter_direction ", action = "store_true", default = FALSE,
+  make_option("--filter_direction", action = "store_true", default = FALSE,
               help = "Filter alignments according to alignment_direction column: We asssume that reads mapped to Head are + and mapped to Tail are -.", 
               metavar = "USE filter_direction filter" ), 
   
-  make_option("--filter_genome_position ", action = "store_true", default = FALSE,
-              help = "Filter alignments according to alignment_genome_start , 
-              metavar = "USE filter_direction filter" ), 
-  
-  make_option("--subseq_length", action = "store", default = 100, 
-              type = "integer", help = "The length of the sub-sequence.",
-              metavar = "Sub-sequence length." ), 
+  # if <0 ignore
+  make_option("--filter_genome_position", action = "store", default = -1,
+              help = "Filter alignments according to alignment_genome_start/genome_end, with threshold of given integer >= 0:.", 
+              type = 'integer',metavar = "USE filter_direction filter with a given threshold" ), 
   
   
-  
-  
- 
-  make_option("--min_density", action = "store", default = 0.6, 
+  make_option("--min_alignment_accuracy", action = "store", default = NULL, 
               type = "double", 
-              help = "Minimal density to consider a subsequence as a pattern region.",
-              metavar = "Minimal density."), 
+              help = "Minimal alignment accuracy (alignment_accuracy = (number of matches) / (matches + mismatches + insertions + deletions) × 100).",
+              metavar = "Minimal alignment accuracy score."), 
   
+  make_option("--min_alignment_coverage_thr", action = "store", default = NULL, 
+              type = "double", 
+              help = "Minimal threshold for The subtelomere coverage: abs(alignment_coverage - subtelomere_length/read_length) <= threshold.",
+              metavar = "Alignmnet coverage threshold"), 
   
+  make_option("--min_alignment_mapping_quality", action = "store", default = NULL, 
+              type = "integer", 
+              help = "Minimal mapping quality (should be an integer in [0,60].",
+              metavar = "Minimap alignmnet mapping quality."), 
   
+  make_option("--genome_edges_length", action = "store", default = NULL, 
+              type = "integer", 
+              help = "The length of the reference genome edges(Heads/Tails) of the chromosomes.",
+              metavar = "Genome edge length."), 
   
-  # pattern/s
-  make_option("--patterns", action = "store", default = NULL, type = "character", 
-              help = "Space separated list of pattern(s). Must be in double quotes.", 
-              metavar = "pattern"), 
-  
-  
-  make_option("--subseq_length", action = "store", default = 100, 
-              type = "integer", help = "The length of the sub-sequence.",
-              metavar = "Sub-sequence length." ), 
-  
-   , 
-  
-  make_option("--check_right_edge", action = "store_true", default = FALSE, 
-              help = "This flag tells us the expected telomere position: helps with the filter and telo_position accuracy", 
-              metavar = "Check right or left edge for filter and position"), 
-  make_option("--tvr_patterns", action = "store", default = NULL, type = "character", 
-              help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
-              metavar = " Telomere variant repeats patterns")
+  make_option("--version", 
+              action = "store_true", 
+              default = FALSE,
+              help = "Print version information and exit")
   
 )   
+
 opt = parse_args(OptionParser(option_list=option_list))  
   
+
+
+# Handle --version flag
+if (opt$version) {
+  cat("Telomere Analyzer  version v1.1.4-beta\n")
+  quit(save = "no", status = 0)
+}  
+
+if( !is.null(opt$min_alignment_mapping_quality)) {
+  if( (opt$min_alignment_mapping_quality < 0) ||
+      (opt$min_alignment_mapping_quality > 60)
+  ){
+    stop("The alignment mapping quality threshold should be an integer in [0,60]!")
+  }
+}
+
+
+if( !is.null(opt$min_alignment_accuracy)) {
+  if( (opt$min_alignment_accuracy < 0) ||
+      (opt$min_alignment_accuracy > 1)
+  ){
+    stop("The alignment accuracy threshold should be a float in [0,1]!")
+  }
+}
+
+ 
+df_join <- join_df(nanotel_summary_path = opt$telo_summary_path, minimap_path = opt$aligner_summary_path)  
+  
+# filterations  
   
   
   
   
+# optional filterations:
+#' 1.  alignment_genome != '*' This is must filter 
+#' 2.  alignment_direction     v
+#' 3.  alignment_genome_start  v
+#' 4.  alignment_genome_end    v
+#' 5.  alignment_accuracy      v [0,1]
+#' 6.  alignment_coverage :    v ( claculate sub-telo coverage and see if it is ~ alignment_coverage(alignment_coverage = (aligned length of query) / (total query length) × 100)
+#' 7.  alignment_mapping_quality v [0,60] int   
+mapping_filter <- function(df_join, filter_column='alignment_genome' , thr=NULL, genome_length=NULL)
+{
+  if(filter_column == 'alignment_genome') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_genome = (alignment_genome != '*') )
+    
+    return(df_join)
+  }
+  
+  # We assume heads are + and atails are -
+  if(filter_column == 'alignment_direction') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_direction = 
+      ( (str_detect(string = alignment_genome, pattern = "Head") & alignment_direction == "+" ) | 
+      (str_detect(string = alignment_genome, pattern = "Tail") & alignment_direction == "-" ) ) )
+    
+    return(df_join)
+  }
   
   
+  # This is to be detected!
+  if(filter_column == 'alignment_genome_start') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
+               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
+    
+    return(df_join)
+  }
+  
+  # same as alignment_genome_star
+  if(filter_column == 'alignment_genome_end') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
+               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
+    
+    return(df_join)
+  }
+  
+  if(filter_column == 'alignment_accuracy') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_accuracy = (alignment_accuracy >= thr))
+    
+    return(df_join)
+  }
+  
+  # todo: Need toa calculate the sub-telo length
+  if(filter_column == 'alignment_coverage') {
+    df_join <- df_join %>% 
+      mutate( )
+    
+    return(df_join)
+  }
+  
+  if(filter_column == 'alignment_mapping_quality') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_mapping_quality = (alignment_mapping_quality  >= thr))
+    
+    return(df_join)
+  }
+}
   
   
-  
-  
-  
-  
-  
-  
+# test alignment_genome filter
+df_pass_genome <- df_join2 %>% 
+  mutate(pass_alignment_mapping_quality = (alignment_mapping_quality  >= 50))
 
   
-  
-  
+# test map quality 
+
+# test direction
+df_pass_genome <- df_join2 %>% 
+  mutate(pass_alignment_direction =  ( (str_detect(string = alignment_genome, pattern = "Head") & alignment_direction == "+" ) | 
+                 (str_detect(string = alignment_genome, pattern = "Tail") & alignment_direction == "-" ) ) )
   
   
   
