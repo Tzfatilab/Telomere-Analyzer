@@ -16,6 +16,88 @@
 # single fastq/a file or a directory containing fastq/a files.
 # Please try to give the output_path outside the input dir path and vice versa
 
+suppressPackageStartupMessages(require(optparse))
+
+global_NanoTel_Version <- 'Telomere Analyzer  version v1.1.5-beta 2026-02-12'
+
+########## start of the flags ###############
+# global vars
+# My last change: 22/10/2022 - change the global_min_density from 0.3 to 0.6
+global_min_density <- 0.6
+
+global_subseq_length <- 100
+
+
+
+option_list = list(
+  
+  # input_path
+  make_option(c("-i","--input_path"), action = "store", type = "character" , 
+              default = NULL, help = "Path to input files.( dir or single file)", metavar = "input path"),
+  
+  # save_path
+  make_option("--save_path", action = "store", 
+              type = "character" , default = NULL, 
+              help = "A path to a directory for storing the output files.", 
+              metavar = "output dir path"),
+  
+  # format( fastq/fasta)
+  make_option("--format", action = "store", 
+              type = "character", default = "fastq" , 
+              help = "input files format (Either \"fastq\" (the default) or \"fasta\", gzip is supported)", 
+              metavar = "file format"),
+  
+  # nrec
+  make_option(c("-n","--nrec"), action = "store", type = "integer", 
+              default = 10000 , 
+              help = "Single integer. The maximum of number of records to read in to memory for each iteration. Negative values are ignored."),
+  
+  # do rc ?
+  make_option(c("-r","--rc"), action = "store_true", default = FALSE, 
+              help = "Should we do reverse complement on the given reads.", 
+              metavar = "Reverse complement on reads."),
+  
+  # pattern/s
+  make_option("--patterns", action = "store", default = NULL, type = "character", 
+              help = "Space separated list of pattern(s). Must be in double quotes.", 
+              metavar = "pattern"), 
+  
+  make_option("--min_density", action = "store", default = 0.6, 
+              type = "double", 
+              help = "Minimal density to consider a subsequence as a pattern region.",
+              metavar = "Minimal density."), 
+  
+  make_option("--subseq_length", action = "store", default = 100, 
+              type = "integer", help = "The length of the sub-sequence.",
+              metavar = "Sub-sequence length." ), 
+  
+  make_option("--use_filter", action = "store_true", default = FALSE,
+              help = "Filter reads accoding to the edge.", 
+              metavar = "USE FILTER" ), 
+  
+  make_option("--check_right_edge", action = "store_true", default = FALSE, 
+              help = "This flag tells us the expected telomere position: helps with the filter and telo_position accuracy", 
+              metavar = "Check right or left edge for filter and position"), 
+  make_option("--tvr_patterns", action = "store", default = NULL, type = "character", 
+              help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
+              metavar = " Telomere variant repeats patterns"), 
+  
+  make_option("--version", 
+              action = "store_true", 
+              default = FALSE,
+              help = "Print version information and exit")
+  
+)   
+opt = parse_args(OptionParser(option_list=option_list))
+
+# Handle --version flag
+if (opt$version) {
+  cat("Telomere Analyzer  version v1.1.5-beta 2026-02-12 \n")
+  quit(save = "no", status = 0)
+}  
+
+
+
 # The 'confilcted' package tries to make your function choice explicit.
 #   it produce an error if a function name is found on 2 or more packages!!!
 suppressPackageStartupMessages(require(S4Vectors))
@@ -28,7 +110,7 @@ suppressPackageStartupMessages(require(parallel))
 suppressPackageStartupMessages(require(logr))
 suppressPackageStartupMessages(require(future))
 suppressPackageStartupMessages(require(ggprism))
-suppressPackageStartupMessages(require(optparse))
+
 suppressPackageStartupMessages(require(testit))
 
 #utils::globalVariables(c("start_index"))
@@ -78,7 +160,7 @@ suppressPackageStartupMessages(require(testit))
 
 global_min_density <- 0.5
 global_subseq_length <- 100
-global_NanoTel_Version <- "v1.1.3-beta-2024-Sep-05"
+
 
 #' bug fix of faild calculating the telomere indcies after re-telo_position:
 #' Check: My last change : 22/10/2023
@@ -2200,70 +2282,7 @@ run_future_worker_chuncks <- function(input_path, output_path, format = c("fasta
 
 
 
-########## start of the flags ###############
-# global vars
-# My last change: 22/10/2022 - change the global_min_density from 0.3 to 0.6
-global_min_density <- 0.6
 
-global_subseq_length <- 100
-
-
-
-option_list = list(
-  
-  # input_path
-  make_option(c("-i","--input_path"), action = "store", type = "character" , 
-              default = NULL, help = "Path to input files.( dir or single file)", metavar = "input path"),
-  
-  # save_path
-  make_option("--save_path", action = "store", 
-              type = "character" , default = NULL, 
-              help = "A path to a directory for storing the output files.", 
-              metavar = "output dir path"),
-  
-  # format( fastq/fasta)
-  make_option("--format", action = "store", 
-              type = "character", default = "fastq" , 
-              help = "input files format (Either \"fastq\" (the default) or \"fasta\", gzip is supported)", 
-              metavar = "file format"),
-  
-  # nrec
-  make_option(c("-n","--nrec"), action = "store", type = "integer", 
-              default = 10000 , 
-              help = "Single integer. The maximum of number of records to read in to memory for each iteration. Negative values are ignored."),
-  
-  # do rc ?
-  make_option(c("-r","--rc"), action = "store_true", default = FALSE, 
-              help = "Should we do reverse complement on the given reads.", 
-              metavar = "Reverse complement on reads."),
-  
-  # pattern/s
-  make_option("--patterns", action = "store", default = NULL, type = "character", 
-              help = "Space separated list of pattern(s). Must be in double quotes.", 
-              metavar = "pattern"), 
-  
-  make_option("--min_density", action = "store", default = 0.6, 
-              type = "double", 
-              help = "Minimal density to consider a subsequence as a pattern region.",
-              metavar = "Minimal density."), 
-  
-  make_option("--subseq_length", action = "store", default = 100, 
-              type = "integer", help = "The length of the sub-sequence.",
-              metavar = "Sub-sequence length." ), 
-  
-  make_option("--use_filter", action = "store_true", default = FALSE,
-              help = "Filter reads accoding to the edge.", 
-              metavar = "USE FILTER" ), 
-  
-  make_option("--check_right_edge", action = "store_true", default = FALSE, 
-              help = "This flag tells us the expected telomere position: helps with the filter and telo_position accuracy", 
-              metavar = "Check right or left edge for filter and position"), 
-  make_option("--tvr_patterns", action = "store", default = NULL, type = "character", 
-              help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
-              metavar = " Telomere variant repeats patterns")
-  
-)   
-opt = parse_args(OptionParser(option_list=option_list))
 
 if(is.null(opt$patterns)) {
   stop("Missing required parameter:  --patterns", call.=FALSE)
