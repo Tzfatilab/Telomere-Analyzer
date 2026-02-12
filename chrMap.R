@@ -187,8 +187,8 @@ copy_reads <- function(df_merged, chrs, nanotel_path, chrs_path, file_extension 
   file_extension <- match.arg(file_extension)
   
   res <- logical()
-  for(chr in chrs) {
-    serial <- df_merged %>% dplyr::filter(alignment_genome == chr) %>% 
+  for(chr in chrs) { ############################## todo: add pass_all column
+    serial <- df_merged %>% dplyr::filter(alignment_genome == chr & pass_all) %>% 
       pull(Serial)
     
     # make reads dir
@@ -234,8 +234,8 @@ copy_plots <- function(df_merged, chrs, nanotel_path, chrs_path,
   res <- logical()
   
   
-  for(chr in chrs) {
-    serial <- df_merged %>% dplyr::filter(alignment_genome == chr) %>% 
+  for(chr in chrs) { ############################## todo: add pass_all column
+    serial <- df_merged %>% dplyr::filter(alignment_genome == chr & pass_all) %>% 
       pull(Serial)
     
     # make reads dir
@@ -511,6 +511,7 @@ if(opt$subtelo_length_thr > 0) {
 
 # filterations  
 df_join <- mapping_filter(df_join, filter = TRUE, filter_column = 'alignment_genome')  
+
 df_join <- mapping_filter(df_join, filter = opt$min_alignment_mapping_quality,
            filter_column = 'alignment_mapping_quality', 
            thr = opt$min_alignment_mapping_quality)  
@@ -525,9 +526,9 @@ df_join <- mapping_filter(df_join, filter = opt$filter_direction, filter_column 
 
 write_csv(x = df_join, file = paste(opt$save_path, "summary_merged.csv", sep = '/'))
 
-df_pass <- df_join %>% 
-  dplyr::filter(if_all(starts_with("pass"))== TRUE)
-
+df_join <- df_join %>% 
+  mutate(pass_all = (if_all(starts_with("pass"))== TRUE))
+df_pass <- df_join %>% dplyr::filter(pass_all == TRUE)
 print(paste(nrow(df_pass), "reads passed all alignment filterations!"))
 
 create_dirs(path = opt$save_path, alignments = unique(df_pass$alignment_genome))
@@ -542,15 +543,6 @@ copy_plots(df_merged = df_join, chrs = unique(df_pass$alignment_genome), nanotel
 
 copy_plots(df_merged = df_join, chrs = unique(df_pass$alignment_genome), nanotel_path = opt$nanotel_path, chrs_path = opt$save_path, file_extension = '.eps', dir_name =  'single_read_plots_adj',  unclassified_serial = unclassified_serial)
 copy_plots(df_merged = df_join, chrs = unique(df_pass$alignment_genome), nanotel_path = opt$nanotel_path, chrs_path = opt$save_path, file_extension = '.jpeg', dir_name =  'single_read_plots',  unclassified_serial = unclassified_serial)
-
-
-
-
-
-
-
-
-
 
 
 
