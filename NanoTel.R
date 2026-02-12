@@ -18,7 +18,7 @@
 
 suppressPackageStartupMessages(require(optparse))
 
-global_NanoTel_Version <- 'Telomere Analyzer  version v1.1.5-beta 2026-02-12'
+global_NanoTel_Version <- 'Telomere Analyzer  version v1.1.6-beta 2026-02-12'
 
 ########## start of the flags ###############
 # global vars
@@ -92,7 +92,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.5-beta 2026-02-12 \n")
+  cat("Telomere Analyzer  version v1.1.6-beta 2026-02-12 \n")
   quit(save = "no", status = 0)
 }  
 
