@@ -137,14 +137,14 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.5-beta 2026-02-12\n")
+  cat("Telomere Analyzer  version v1.1.6-beta 2026-02-12\n")
   quit(save = "no", status = 0)
 }  
 
 
 
 library(readr)
-library(dplyr)
+suppressPackageStartupMessages(require(dplyr))
 library(stringr)
 library(conflicted)
 library(logr)
@@ -449,58 +449,121 @@ mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome'
 if (is.null(opt$save_path)) {
   stop("Missing required parameter:  --save_path", call.=FALSE)
 }
+
+if(!dir.exists(opt$save_path)) { # update  did it
+  dir.create(opt$save_path)
+}
+
+tmp <- file.path(opt$save_path, "run.log")
+
+# Open log
+lf <- log_open(tmp)
+log_print('Telomere Analyzer  version v1.1.6-beta 2026-02-12', hide_notes = TRUE) 
+
 if (is.null(opt$telo_summary_path)) {
+  log_error("Missing required parameter:  --telo_summary_path")
+  log_close()
+  writeLines(readLines(lf))
   stop("Missing required parameter:  --telo_summary_path", call.=FALSE)
+} else {
+  log_print(paste('NanoTel summary path:', opt$telo_summary_path), hide_notes = TRUE) 
 }
+
+
+
 if (is.null(opt$nanotel_path)) {
+  log_error("Missing required parameter:  --nanotel_path")
+  log_close()
+  writeLines(readLines(lf))
   stop("Missing required parameter:  --nanotel_path", call.=FALSE)
+} else {
+  log_print(paste('NanoTel output path:', opt$nanotel_path), hide_notes = TRUE) 
 }
+
 if (is.null(opt$aligner_summary_path)) {
+  log_error("Missing required parameter:  --aligner_summary_path")
+  log_close()
+  writeLines(readLines(lf))
   stop("Missing required parameter:  --aligner_summary_path", call.=FALSE)
+} else {
+  log_print(paste('Alignment summary path:', opt$aligner_summary_path), hide_notes = TRUE)
 }
 
 # optional flags       min_alignment_mapping_quality min_alignment_accuracy min_alignment_coverage_th
 if( !is.null(opt$min_alignment_mapping_quality)) {
   if( (opt$min_alignment_mapping_quality < 0) ||
       (opt$min_alignment_mapping_quality > 60)
-  ){
+  ){log_error("The alignment mapping quality threshold should be an integer in [0,60]!")
+    log_close()
+    writeLines(readLines(lf))
     stop("The alignment mapping quality threshold should be an integer in [0,60]!")
+  } else 
+  {
+    log_print(paste('Alignment mapping quality threshold:', opt$min_alignment_mapping_quality), hide_notes = TRUE)
   }
 }
+
 if( !is.null(opt$min_alignment_accuracy)) {
   if( (opt$min_alignment_accuracy < 0) ||
       (opt$min_alignment_accuracy > 1)
   ){
+    log_error("The alignment accuracy threshold should be a float in [0,1]!")
+    log_close()
+    writeLines(readLines(lf))
     stop("The alignment accuracy threshold should be a float in [0,1]!")
+  } else {
+    log_print(paste('Alignment accuracy threshold:', opt$min_alignment_accuracy), hide_notes = TRUE)
   }
-}
+} 
+
 if( !is.null(opt$min_alignment_coverage_thr)) {
   if( (opt$min_alignment_coverage_thr < 0) ||
       (opt$min_alignment_coverage_thr > 1)
   ){
+    log_error("The alignment coverage threshold should be a float in [0,1]!")
+    log_close()
+    writeLines(readLines(lf))
     stop("The alignment coverage threshold should be a float in [0,1]!")
+  } else {
+    log_print(paste('Alignment coverage threshold:', opt$min_alignment_coverage_thr), hide_notes = TRUE)
   }
 }
+
+
 if( !is.null(opt$genome_edges_length)) {
   if( opt$genome_edges_length < 10000){
+    log_error("The refrennce edges should be at least 10K length")
+    log_close()
+    writeLines(readLines(lf))
     stop("The refrennce edges should be at least 10K length!")
+  } else {
+    log_print(paste('refrennce edges length:', opt$genome_edges_length), hide_notes = TRUE)
   }
 }
 
 if(! (opt$telo_index %in% c("telomere", "mismatch", "tvr"))) {
+  log_error("The telomere index parameter should be telomere, mismatch or tvr!")
+  log_close()
+  writeLines(readLines(lf))
   stop("The telomere index parameter should be telomere, mismatch or tvr!")
-}
-if(!dir.exists(opt$save_path)) { # update  did it
-  dir.create(opt$save_path)
+} else {
+  log_print(paste("Calculating the subtelomeric length using", opt$telo_index), , hide_notes = TRUE)
 }
 
  
 # Null defaullts :   
 df_join <- join_df(nanotel_summary_path = opt$telo_summary_path, minimap_path = opt$aligner_summary_path) 
-print(paste("There are", nrow(df_join), "telomeric reads.")) # todo: add to log
+log_print(paste("There are", nrow(df_join), "telomeric reads."), hide_notes = TRUE) 
+
 
 # calculate sub-telo accordingly
 df_join <- calculate_subtelo(df_join, telo_index = opt$telo_index, telo_position = ifelse(opt$telo_right, yes = "right", no = "left"))
+
+
+
+
+log_print("Arguments structure:")
+log_print(capture.output(str(opt)))
 
 if(opt$subtelo_length_thr > 0) {
   df_join  <- df_join  %>% 
@@ -529,7 +592,7 @@ write_csv(x = df_join, file = paste(opt$save_path, "summary_merged.csv", sep = '
 df_join <- df_join %>% 
   mutate(pass_all = (if_all(starts_with("pass"))== TRUE))
 df_pass <- df_join %>% dplyr::filter(pass_all == TRUE)
-print(paste(nrow(df_pass), "reads passed all alignment filterations!"))
+log_print(paste(nrow(df_pass), "reads passed all alignment filterations!"), hide_notes = TRUE)
 
 create_dirs(path = opt$save_path, alignments = unique(df_pass$alignment_genome))
 
@@ -547,6 +610,8 @@ copy_plots(df_merged = df_join, chrs = unique(df_pass$alignment_genome), nanotel
 
 
 
+log_close()
+writeLines(readLines(lf))
 
 
 
@@ -562,12 +627,7 @@ copy_plots(df_merged = df_join, chrs = unique(df_pass$alignment_genome), nanotel
 
 
 
-
-
-
-
-
-
+# log ptint work inside
 
 
 
