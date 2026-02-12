@@ -85,3 +85,14 @@ The code was written in R 4.2.2 version. The following R packages should be prei
 ### Citing NanoTel 
 If you use NanoTel in your work, please cite:  
 Smoom R., May C.L., Ortiz V., Tigue, M., Kolev H., Reizel Y., Morgan A., Egyes, N., Lichtental D., Skordalakes E., Kaestner K.H., & Tzfati Y. A single amino acid in RTEL1 determines telomere length in mice. BioRxiv:  https://doi.org/10.1101/2021.06.06.447246
+
+
+# chrMap
+### This script help to filter NAnoTel results with minimap2 alignment using The dorado aligner summary file. (workd for dorado version 1.3.1 or newer +  and NanoTel version v1.1.4-beta or newer.)
+See details using the --help flag.
+
+
+
+
+
+
