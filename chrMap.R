@@ -137,7 +137,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.6-beta 2026-02-12\n")
+  cat("Telomere Analyzer  version v1.1.7-beta 2026-02-18\n")
   quit(save = "no", status = 0)
 }  
 
@@ -320,7 +320,7 @@ join_df <- function(nanotel_summary_path, minimap_path){
 
 
 # todo: load all the other packages after this line inorder to save time!
-
+# todo: For -1 , find alternative: claculate instead with the valid indices 
 # todo: check if it works!!!!
 
 #' @description
@@ -360,85 +360,6 @@ calculate_subtelo <- function(df, telo_index=c("telomere", "mismatch", "tvr"), t
   return(df)
 }  
 
-# optional filterations:
-#' 1.  alignment_genome != '*' This is must filter 
-#' 2.  alignment_direction     v
-#' 3.  alignment_genome_start  v
-#' 4.  alignment_genome_end    v
-#' 5.  alignment_accuracy      v [0,1]
-#' 6.  alignment_coverage :    v ( claculate sub-telo coverage and see if it is ~ alignment_coverage(alignment_coverage = (aligned length of query) / (total query length) × 100)
-#' 7.  alignment_mapping_quality v [0,60] int   
-mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome' , thr=NULL, genome_length=NULL, telo_index="telomere", telo_right=FALSE)
-{
-  if(is.null(filter)){ return(df_join)}
-  if(filter==FALSE){ return(df_join)}
-  
-  if(filter_column == 'alignment_genome') {
-    df_join <- df_join %>% 
-      mutate(pass_alignment_genome = (alignment_genome != '*') )
-    print(paste(sum(df_join$pass_alignment_genome), "reads pass the alignment filteration!"))
-    return(df_join)
-  }
-  
-  # We assume heads are + and atails are -
-  if(filter_column == 'alignment_direction') {
-    df_join <- df_join %>% 
-      mutate(pass_alignment_direction = 
-               ( (str_detect(string = alignment_genome, pattern = "Head") & alignment_direction == "+" ) | 
-                   (str_detect(string = alignment_genome, pattern = "Tail") & alignment_direction == "-" ) ) )
-    print(paste(sum(df_join$pass_alignment_direction), "reads pass the alignment direction filteration!"))
-    return(df_join)
-  }
-  
-  
-  # This is to be detected!
-  if(filter_column == 'alignment_genome_start') {
-    if(is.null(genome_length)) {
-      warning("No genome length givven so cab filter genome indices! Make sure to use the --genome_edges_length flag!")
-      return(df_join)
-    }
-    df_join <- df_join %>% 
-      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
-               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
-    print(paste(sum(df_join$pass_alignment_genome_start_end), "reads pass the genome position filteration!"))
-    return(df_join)
-  }
-  
-  # same as alignment_genome_star
-  if(filter_column == 'alignment_genome_end') {
-    df_join <- df_join %>% 
-      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
-               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
-    
-    return(df_join)
-  }
-  
-  if(filter_column == 'alignment_accuracy') {
-    df_join <- df_join %>% 
-      mutate(pass_alignment_accuracy = (alignment_accuracy >= thr))
-    print(paste(sum(df_join$pass_alignment_accuracy), "reads pass the alignment_accuracy filteration of", thr, "!"))
-    return(df_join)
-  }
-  
-  # todo: Need toa calculate the sub-telo length
-  if(filter_column == 'alignment_coverage') {
-    #df_join <- calculate_subtelo(df_join)
-    df_join <- df_join %>% 
-      mutate(pass_alignment_coverage = (abs(subtelo_length/sequence_length - alignment_coverage) < thr ))
-    print(paste(sum(df_join$pass_alignment_coverage), "reads pass the alignment coverage filteration of", thr, " which is the diffrence between alignment coverage and sub-telomere coverage!"))
-    # sum( abs( (subtelo_length2 / df_pass_genome$sequence_length) - df_pass_genome$alignment_coverage ) <0.2 )
-    return(df_join)
-  }
-  
-  if(filter_column == 'alignment_mapping_quality') {
-    df_join <- df_join %>% 
-      mutate(pass_alignment_mapping_quality = (alignment_mapping_quality  >= thr))
-    print(paste(sum(df_join$pass_alignment_mapping_quality), "reads pass the alignment mapping quality filteration of", thr, "!"))
-    return(df_join)
-  }
-  
-}
-
 
 
 
@@ -458,7 +379,94 @@ tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
 lf <- log_open(tmp)
-log_print('Telomere Analyzer  version v1.1.6-beta 2026-02-12', hide_notes = TRUE) 
+log_print('Telomere Analyzer  version v1.1.6-beta 2026-02-12', hide_notes = TRUE, console = FALSE) 
+
+# optional filterations:
+#' 1.  alignment_genome != '*' This is must filter 
+#' 2.  alignment_direction     v
+#' 3.  alignment_genome_start  v
+#' 4.  alignment_genome_end    v
+#' 5.  alignment_accuracy      v [0,1]
+#' 6.  alignment_coverage :    v ( claculate sub-telo coverage and see if it is ~ alignment_coverage(alignment_coverage = (aligned length of query) / (total query length) × 100)
+#' 7.  alignment_mapping_quality v [0,60] int   
+mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome' , thr=NULL, genome_length=NULL, telo_index="telomere", telo_right=FALSE)
+{
+  if(is.null(filter)){ return(df_join)}
+  if(filter==FALSE){ return(df_join)}
+  
+  if(filter_column == 'alignment_genome') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_genome = (alignment_genome != '*') )
+    log_print(paste(sum(df_join$pass_alignment_genome), "reads pass the alignment filteration!"), console = FALSE, hide_notes = TRUE)
+    return(df_join)
+  }
+  
+  # We assume heads are + and atails are -
+  if(filter_column == 'alignment_direction') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_direction = 
+               ( (str_detect(string = alignment_genome, pattern = "Head") & alignment_direction == "+" ) | 
+                   (str_detect(string = alignment_genome, pattern = "Tail") & alignment_direction == "-" ) ) )
+    log_print(paste(sum(df_join$pass_alignment_direction), "reads pass the alignment direction filteration!"), console = FALSE, hide_notes = TRUE)
+    return(df_join)
+  }
+  
+  
+  # This is to be detected!
+  if(filter_column == 'alignment_genome_start') {
+    if(is.null(genome_length)) {
+      warning("No genome length givven so cab filter genome indices! Make sure to use the --genome_edges_length flag!")
+      return(df_join)
+    }
+    df_join <- df_join %>% 
+      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
+               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
+    log_print(paste(sum(df_join$pass_alignment_genome_start_end), "reads pass the genome position filteration!"), console = FALSE, hide_notes = TRUE)
+    return(df_join)
+  }
+  
+  # same as alignment_genome_star
+  if(filter_column == 'alignment_genome_end') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
+               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
+    
+    return(df_join)
+  }
+  
+  if(filter_column == 'alignment_accuracy') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_accuracy = (alignment_accuracy >= thr))
+    log_print(paste(sum(df_join$pass_alignment_accuracy), "reads pass the alignment_accuracy filteration of", thr, "!"), console = FALSE, hide_notes = TRUE)
+    return(df_join)
+  }
+  
+  # todo: Need toa calculate the sub-telo length
+  if(filter_column == 'alignment_coverage') {
+    #df_join <- calculate_subtelo(df_join)
+    df_join <- df_join %>% 
+      mutate(pass_alignment_coverage = (abs(subtelo_length/sequence_length - alignment_coverage) < thr ))
+    log_print(paste(sum(df_join$pass_alignment_coverage), "reads pass the alignment coverage filteration of", thr, " which is the diffrence between alignment coverage and sub-telomere coverage!"), console = FALSE, hide_notes = TRUE)
+    # sum( abs( (subtelo_length2 / df_pass_genome$sequence_length) - df_pass_genome$alignment_coverage ) <0.2 )
+    return(df_join)
+  }
+  
+  if(filter_column == 'alignment_mapping_quality') {
+    df_join <- df_join %>% 
+      mutate(pass_alignment_mapping_quality = (alignment_mapping_quality  >= thr))
+    log_print(paste(sum(df_join$pass_alignment_mapping_quality), "reads pass the alignment mapping quality filteration of", thr, "!"), console = FALSE, hide_notes = TRUE)
+    return(df_join)
+  }
+  
+} # End of mapping_filter
+
+
+
+
+
+
+
+
 
 if (is.null(opt$telo_summary_path)) {
   log_error("Missing required parameter:  --telo_summary_path")
@@ -466,7 +474,7 @@ if (is.null(opt$telo_summary_path)) {
   writeLines(readLines(lf))
   stop("Missing required parameter:  --telo_summary_path", call.=FALSE)
 } else {
-  log_print(paste('NanoTel summary path:', opt$telo_summary_path), hide_notes = TRUE) 
+  log_print(paste('NanoTel summary path:', opt$telo_summary_path), hide_notes = TRUE, console = FALSE) 
 }
 
 
@@ -477,7 +485,7 @@ if (is.null(opt$nanotel_path)) {
   writeLines(readLines(lf))
   stop("Missing required parameter:  --nanotel_path", call.=FALSE)
 } else {
-  log_print(paste('NanoTel output path:', opt$nanotel_path), hide_notes = TRUE) 
+  log_print(paste('NanoTel output path:', opt$nanotel_path), hide_notes = TRUE, console = FALSE) 
 }
 
 if (is.null(opt$aligner_summary_path)) {
@@ -486,7 +494,7 @@ if (is.null(opt$aligner_summary_path)) {
   writeLines(readLines(lf))
   stop("Missing required parameter:  --aligner_summary_path", call.=FALSE)
 } else {
-  log_print(paste('Alignment summary path:', opt$aligner_summary_path), hide_notes = TRUE)
+  log_print(paste('Alignment summary path:', opt$aligner_summary_path), hide_notes = TRUE, console = FALSE)
 }
 
 # optional flags       min_alignment_mapping_quality min_alignment_accuracy min_alignment_coverage_th
@@ -499,7 +507,7 @@ if( !is.null(opt$min_alignment_mapping_quality)) {
     stop("The alignment mapping quality threshold should be an integer in [0,60]!")
   } else 
   {
-    log_print(paste('Alignment mapping quality threshold:', opt$min_alignment_mapping_quality), hide_notes = TRUE)
+    log_print(paste('Alignment mapping quality threshold:', opt$min_alignment_mapping_quality), hide_notes = TRUE, console = FALSE)
   }
 }
 
@@ -512,7 +520,7 @@ if( !is.null(opt$min_alignment_accuracy)) {
     writeLines(readLines(lf))
     stop("The alignment accuracy threshold should be a float in [0,1]!")
   } else {
-    log_print(paste('Alignment accuracy threshold:', opt$min_alignment_accuracy), hide_notes = TRUE)
+    log_print(paste('Alignment accuracy threshold:', opt$min_alignment_accuracy), hide_notes = TRUE, console = FALSE)
   }
 } 
 
@@ -525,7 +533,7 @@ if( !is.null(opt$min_alignment_coverage_thr)) {
     writeLines(readLines(lf))
     stop("The alignment coverage threshold should be a float in [0,1]!")
   } else {
-    log_print(paste('Alignment coverage threshold:', opt$min_alignment_coverage_thr), hide_notes = TRUE)
+    log_print(paste('Alignment coverage threshold:', opt$min_alignment_coverage_thr), hide_notes = TRUE, console = FALSE)
   }
 }
 
@@ -537,7 +545,7 @@ if( !is.null(opt$genome_edges_length)) {
     writeLines(readLines(lf))
     stop("The refrennce edges should be at least 10K length!")
   } else {
-    log_print(paste('refrennce edges length:', opt$genome_edges_length), hide_notes = TRUE)
+    log_print(paste('refrennce edges length:', opt$genome_edges_length), hide_notes = TRUE, console = FALSE)
   }
 }
 
@@ -547,13 +555,13 @@ if(! (opt$telo_index %in% c("telomere", "mismatch", "tvr"))) {
   writeLines(readLines(lf))
   stop("The telomere index parameter should be telomere, mismatch or tvr!")
 } else {
-  log_print(paste("Calculating the subtelomeric length using", opt$telo_index), , hide_notes = TRUE)
+  log_print(paste("Calculating the subtelomeric length using", opt$telo_index), , hide_notes = TRUE, console = FALSE)
 }
 
  
 # Null defaullts :   
 df_join <- join_df(nanotel_summary_path = opt$telo_summary_path, minimap_path = opt$aligner_summary_path) 
-log_print(paste("There are", nrow(df_join), "telomeric reads."), hide_notes = TRUE) 
+log_print(paste("There are", nrow(df_join), "telomeric reads."), hide_notes = TRUE, console = FALSE) 
 
 
 # calculate sub-telo accordingly
@@ -562,13 +570,13 @@ df_join <- calculate_subtelo(df_join, telo_index = opt$telo_index, telo_position
 
 
 
-log_print("Arguments structure:")
-log_print(capture.output(str(opt)))
+log_print("Arguments structure:", console = FALSE, hide_notes = TRUE)
+log_print(capture.output(str(opt)), console = FALSE, hide_notes = TRUE)
 
-if(opt$subtelo_length_thr > 0) {
+if(opt$subtelo_length_thr > 0) { 
   df_join  <- df_join  %>% 
     mutate(pass_subtelo_length = subtelo_length >= opt$subtelo_length_thr)
-  print(paste(sum(df_join$pass_subtelo_length), "reads pass the alignment subtelomeric length filteration of threshold", opt$subtelo_length_th, "!"))
+  log_print(paste(sum(df_join$pass_subtelo_length), "reads pass the alignment subtelomeric length filteration of threshold", opt$subtelo_length_th, "!"), console = FALSE, hide_notes = TRUE)
 }
 
 
@@ -592,7 +600,7 @@ write_csv(x = df_join, file = paste(opt$save_path, "summary_merged.csv", sep = '
 df_join <- df_join %>% 
   mutate(pass_all = (if_all(starts_with("pass"))== TRUE))
 df_pass <- df_join %>% dplyr::filter(pass_all == TRUE)
-log_print(paste(nrow(df_pass), "reads passed all alignment filterations!"), hide_notes = TRUE)
+log_print(paste(nrow(df_pass), "reads passed all alignment filterations!"), hide_notes = TRUE, console = FALSE)
 
 create_dirs(path = opt$save_path, alignments = unique(df_pass$alignment_genome))
 
@@ -610,7 +618,7 @@ copy_plots(df_merged = df_join, chrs = unique(df_pass$alignment_genome), nanotel
 
 
 
-log_close()
+log_close(footer = FALSE)
 writeLines(readLines(lf))
 
 
@@ -628,7 +636,6 @@ writeLines(readLines(lf))
 
 
 # log ptint work inside
-
 
 
 
