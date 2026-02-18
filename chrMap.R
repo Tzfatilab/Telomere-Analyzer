@@ -379,7 +379,7 @@ tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
 lf <- log_open(tmp)
-log_print('Telomere Analyzer  version v1.1.7-beta 2026-02-12', hide_notes = TRUE, console = FALSE) 
+log_print('Telomere Analyzer  version v1.1.7-beta 2026-02-18', hide_notes = TRUE, console = FALSE) 
 
 # optional filterations:
 #' 1.  alignment_genome != '*' This is must filter 
