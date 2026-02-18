@@ -2328,7 +2328,7 @@ lockBinding("global_min_density", globalenv())
 tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
-lf <- log_open(tmp) 'Telomere Analyzer  version v1.1.7-beta 2026-02-18'
+lf <- log_open(tmp) 
 log_print('Telomere Analyzer  version v1.1.7-beta 2026-02-18', hide_notes = TRUE, console = FALSE) # Send message to log
 t1 <- Sys.time()
 log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE, console = FALSE) # Send message to log
