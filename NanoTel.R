@@ -18,8 +18,6 @@
 
 suppressPackageStartupMessages(require(optparse))
 
-global_NanoTel_Version <- 'Telomere Analyzer  version v1.1.6-beta 2026-02-12'
-
 ########## start of the flags ###############
 # global vars
 # My last change: 22/10/2022 - change the global_min_density from 0.3 to 0.6
@@ -92,7 +90,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.6-beta 2026-02-12 \n")
+  cat("Telomere Analyzer  version v1.1.7-beta 2026-02-18 \n")
   quit(save = "no", status = 0)
 }  
 
@@ -2330,30 +2328,30 @@ lockBinding("global_min_density", globalenv())
 tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
-lf <- log_open(tmp)
-log_print(base::paste("NanoTel Version: ", global_NanoTel_Version), hide_notes = TRUE) # Send message to log
+lf <- log_open(tmp) 'Telomere Analyzer  version v1.1.7-beta 2026-02-18'
+log_print('Telomere Analyzer  version v1.1.7-beta 2026-02-18', hide_notes = TRUE, console = FALSE) # Send message to log
 t1 <- Sys.time()
-log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE) # Send message to log
+log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE, console = FALSE) # Send message to log
 
-log_print("############### The input argumetns for this run: ################")
+log_print("############### The input argumetns for this run: ################", hide_notes = TRUE, console = FALSE)
 if(opt$r) {
-  log_print("Reverse complement was applied on the input reads.")
+  log_print("Reverse complement was applied on the input reads.", hide_notes = TRUE, console = FALSE)
 }
-log_print(base::paste("The patterns to search:", opt$patterns), hide_notes = TRUE)
+log_print(base::paste("The patterns to search:", opt$patterns), hide_notes = TRUE, console = FALSE)
 log_print(base::paste("The sub-sequence length  is:", 
-                      toString(opt$subseq_length)), hide_notes = TRUE)
+                      toString(opt$subseq_length)), hide_notes = TRUE, console = FALSE)
 log_print(base::paste("The minimal density for a telomeric subseq:", 
-                      toString(opt$min_density)), hide_notes = TRUE)
+                      toString(opt$min_density)), hide_notes = TRUE, console = FALSE)
 
 if(!is.null(cur_tvr_patterns) ) {
   log_print(base::paste("Additional Telomere variant repeats patterns were added:", 
-                        opt$tvr_patterns), hide_notes = TRUE)
+                        opt$tvr_patterns), hide_notes = TRUE, console = FALSE)
 }
 
 
-log_print("##################################################################")
+log_print("##################################################################",hide_notes = TRUE, , console = FALSE)
 
-log_print("The input files:", hide_notes = TRUE)
+log_print("The input files:", hide_notes = TRUE, console = FALSE)
 # add the names of the files which we analyze.
 
 
@@ -2362,10 +2360,10 @@ if(dir.exists(opt$i) ){
                  path = opt$i, recursive = TRUE, include.dirs = FALSE)
   
   for(i in seq_along(filepath)) {
-    log_print(filepath[i], hide_notes = TRUE)
+    log_print(filepath[i], hide_notes = TRUE, console = FALSE)
   }
 } else {
-  log_print(opt$i, hide_notes = TRUE)
+  log_print(opt$i, hide_notes = TRUE, console = FALSE)
 }
 
 create_dirs(output_dir = opt$save_path)
@@ -2378,9 +2376,9 @@ ans_list <- run_future_worker_chuncks(input_path = opt$i, output_path = opt$save
 
 global_total_length <- length(ans_list$all_reads_length_vec)
 
-log_print(base::paste("Total reads in sample:", global_total_length), hide_notes = TRUE)
-log_print("Summary statistics of the sample reads length:", hide_notes = TRUE)
-log_print(summary(ans_list$all_reads_length_vec), hide_notes = TRUE)
+log_print(base::paste("Total reads in sample:", global_total_length), hide_notes = TRUE, console = FALSE)
+log_print("Summary statistics of the sample reads length:", hide_notes = TRUE, console = FALSE)
+log_print(summary(ans_list$all_reads_length_vec), hide_notes = TRUE, console = FALSE)
 
 # try FastqStreamerList for streaming, n records each yield ....
 
@@ -2390,23 +2388,23 @@ log_print(summary(ans_list$all_reads_length_vec), hide_notes = TRUE)
 
 
 
-log_print(base::paste0("Number of reads which identified as Telomeric: ", nrow(ans_list$df_summary)), hide_notes = TRUE)
-log_print(base::paste0("% of total reads: ", toString(round( (100*nrow(ans_list$df_summary)) / global_total_length, 2 ) ), "%" ), hide_notes = TRUE)
+log_print(base::paste0("Number of reads which identified as Telomeric: ", nrow(ans_list$df_summary)), hide_notes = TRUE, console = FALSE)
+log_print(base::paste0("% of total reads: ", toString(round( (100*nrow(ans_list$df_summary)) / global_total_length, 2 ) ), "%" ), hide_notes = TRUE, console = FALSE)
 
 # summary statistics of the Telomeric reads
-log_print("Summary statistics for the Telomeric reads:", hide_notes = TRUE)
-log_print("reads length:", hide_notes = TRUE)
-log_print(summary(ans_list$df_summary$sequence_length), hide_notes = TRUE)
-log_print("Telomere length:", hide_notes = TRUE)
-log_print(summary(ans_list$df_summary$Telomere_length), hide_notes = TRUE)
+log_print("Summary statistics for the Telomeric reads:", hide_notes = TRUE, console = FALSE)
+log_print("reads length:", hide_notes = TRUE, console = FALSE)
+log_print(summary(ans_list$df_summary$sequence_length), hide_notes = TRUE, console = FALSE)
+log_print("Telomere length:", hide_notes = TRUE, console = FALSE)
+log_print(summary(ans_list$df_summary$Telomere_length), hide_notes = TRUE, console = FALSE)
 
-log_print("Telomere length with 1 mismatch allowed:", hide_notes = TRUE)
-log_print(summary(ans_list$df_summary$Telomere_length_mismatch), hide_notes = TRUE)
+log_print("Telomere length with 1 mismatch allowed:", hide_notes = TRUE, console = FALSE)
+log_print(summary(ans_list$df_summary$Telomere_length_mismatch), hide_notes = TRUE, console = FALSE)
 
 
 if(!is.null(cur_tvr_patterns)) {
-  log_print('Telomere length with 1 mismatch allowed + tvr patterns.:', hide_notes = TRUE)
-  log_print(summary(ans_list$df_summary$Telomere_length_mismatch_tvr), hide_notes = TRUE)
+  log_print('Telomere length with 1 mismatch allowed + tvr patterns.:', hide_notes = TRUE, console = FALSE)
+  log_print(summary(ans_list$df_summary$Telomere_length_mismatch_tvr), hide_notes = TRUE, console = FALSE)
 }
 
 
@@ -2415,9 +2413,9 @@ write_lines(x = ans_list$df_summary$sequence_ID  , file = file.path(opt$save_pat
 t2 <- Sys.time()
 
 
-log_print(base::paste("Work ended at:", toString(t2)), hide_notes = TRUE)
+log_print(base::paste("Work ended at:", toString(t2)), hide_notes = TRUE, console = FALSE)
 # Close log
-log_close()
+log_close(footer = FALSE)
 writeLines(readLines(lf))
 
 
