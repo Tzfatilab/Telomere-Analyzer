@@ -94,16 +94,20 @@ option_list = list(
   # todo: need to take additional arg if to check with telo_mismach, telo or telo_tvr indices
   make_option("--min_alignment_coverage_thr", action = "store", default = NULL, 
               type = "double", 
-              help = "Minimal threshold for The subtelomere coverage: abs(alignment_coverage - subtelomere_length/read_length) <= threshold.",
+              help = "Minimal threshold for The subtelomere coverage: abs(alignment_coverage - subtelomere_length/read_length) <= threshold  or  
+              abs(alignment_coverage - genome_edges_length) <= threshold if subtelomere length > genome_edges_length 
+              This flag can only be used with a given genome_edges_length number!",
               metavar = "Alignmnet coverage threshold"), 
   
   # todo : add a logical which tells if it is right or left
   make_option("--telo_index", action = "store", default = "telomere", type = "character", 
-              help = "The indices for computing the subtelomere length: choose from Telomere_start/end, Telomere_start_mismatch/end_mismatch or Telomere_start_mismatch_tvr/end_mismatch_tvr: the argument must be one of the 3: telomere, mismatch or tvr!",
+              help = "The indices for computing the subtelomere length: choose from Telomere_start/end, Telomere_start_mismatch/end_mismatch or
+              Telomere_start_mismatch_tvr/end_mismatch_tvr: the argument must be one of the 3: telomere, mismatch or tvr!",
               metavar = "Column for computing subtelomere length."),
   
   make_option("--telo_right", action = "store_true", default = FALSE,
-              help = "Use this flag if the Telomere should be at the right edge of the read otherwise it will assume the telomere is at the left edge, helps for calculating the sub-telo length accordingly.",
+              help = "Use this flag if the Telomere should be at the right edge of the read otherwise it will assume the telomere is at the 
+              left edge, helps for calculating the sub-telo length accordingly.",
               metavar = "Telomere position at the right edge."), 
   
   make_option("--min_alignment_mapping_quality", action = "store", default = NULL, 
@@ -113,7 +117,7 @@ option_list = list(
   
   make_option("--genome_edges_length", action = "store", default = NULL, 
               type = "integer", 
-              help = "The length of the reference genome edges(Heads/Tails) of the chromosomes.",
+              help = "The length of the reference genome edges(Heads/Tails) of the chromosomes. (We assume all edges have equal length.",
               metavar = "Genome edge length."), 
   
   make_option("--version", 
@@ -124,7 +128,7 @@ option_list = list(
   # opt$file_extension for reads (now support fasta or fasta.gzip)
   make_option("--file_extension", action = "store", default = ".fasta", type = "character", 
               help = "File extension for HTS reads (for now only fasta(default) or fasta.gzip", 
-              metavar = "fasta or fasta.gzip"), 
+              metavar = ".fasta or .fasta.gzip"), 
   # subtelo_length_thr
   make_option("--subtelo_length_thr", action = "store", default = 4000L, 
               type = "integer", 
@@ -137,7 +141,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.7-beta 2026-02-18\n")
+  cat("Telomere Analyzer  version v1.1.8-beta 2026-02-19\n")
   quit(save = "no", status = 0)
 }  
 
@@ -379,7 +383,7 @@ tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
 lf <- log_open(tmp)
-log_print('Telomere Analyzer  version v1.1.7-beta 2026-02-18', hide_notes = TRUE, console = FALSE) 
+log_print('Telomere Analyzer  version v1.1.8-beta 2026-02-19', hide_notes = TRUE, console = FALSE) 
 
 # optional filterations:
 #' 1.  alignment_genome != '*' This is must filter 
@@ -425,14 +429,6 @@ mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome'
     return(df_join)
   }
   
-  # same as alignment_genome_star
-  if(filter_column == 'alignment_genome_end') {
-    df_join <- df_join %>% 
-      mutate(pass_alignment_genome_start_end = (alignment_genome_start <= thr & str_detect(string = alignment_genome, pattern = "Head")) | 
-               (abs(alignment_genome_end - genome_length) <= thr & str_detect(string = alignment_genome, pattern = "Tail")) ) 
-    
-    return(df_join)
-  }
   
   if(filter_column == 'alignment_accuracy') {
     df_join <- df_join %>% 
@@ -445,7 +441,9 @@ mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome'
   if(filter_column == 'alignment_coverage') {
     #df_join <- calculate_subtelo(df_join)
     df_join <- df_join %>% 
-      mutate(pass_alignment_coverage = (abs(subtelo_length/sequence_length - alignment_coverage) < thr ))
+      mutate( pass_alignment_coverage = if_else(subtelo_length <= genome_length,
+            (abs(subtelo_length/sequence_length - alignment_coverage) < thr ), abs(alignment_coverage - genome_length) <= thr)
+              ) # end of mutate
     log_print(paste(sum(df_join$pass_alignment_coverage), "reads pass the alignment coverage filteration of", thr, " which is the diffrence between alignment coverage and sub-telomere coverage!"), console = FALSE, hide_notes = TRUE)
     # sum( abs( (subtelo_length2 / df_pass_genome$sequence_length) - df_pass_genome$alignment_coverage ) <0.2 )
     return(df_join)
@@ -525,6 +523,15 @@ if( !is.null(opt$min_alignment_accuracy)) {
 } 
 
 if( !is.null(opt$min_alignment_coverage_thr)) {
+  
+  # needed to calculate incase the subtelo length >> ref length
+  if(is.null(opt$genome_edges_length)) {
+    log_error("The genome_edges_length edges flag is needed for calculating coverage!")
+    log_close()
+    writeLines(readLines(lf))
+    stop("The genome_edges_length edges flag is needed for calculating coverage!")
+  }
+  
   if( (opt$min_alignment_coverage_thr < 0) ||
       (opt$min_alignment_coverage_thr > 1)
   ){
@@ -591,7 +598,7 @@ df_join <- mapping_filter(df_join, filter = opt$filter_genome_position , filter_
 
 df_join <- mapping_filter(df_join, filter = opt$min_alignment_accuracy, filter_column = 'alignment_accuracy', thr = opt$min_alignment_accuracy)  
 
-df_join <- mapping_filter(df_join, filter = opt$min_alignment_coverage_thr, filter_column = 'alignment_coverage', thr = opt$min_alignment_coverage_thr, telo_index = opt$telo_index,telo_right =telo_rightt$telo_right )    
+df_join <- mapping_filter(df_join, filter = opt$min_alignment_coverage_thr, filter_column = 'alignment_coverage', thr = opt$min_alignment_coverage_thr, telo_index = opt$telo_index,telo_right =telo_rightt$telo_right, genome_length = opt$genome_edges_length)    
 
 df_join <- mapping_filter(df_join, filter = opt$filter_direction, filter_column = 'alignment_direction')   
 
