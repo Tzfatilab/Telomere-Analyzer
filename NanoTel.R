@@ -90,7 +90,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.8-beta 2026-02-19 \n")
+  cat("Telomere Analyzer  version v1.1.9-beta 2026-02-19 \n")
   quit(save = "no", status = 0)
 }  
 
@@ -2329,7 +2329,7 @@ tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
 lf <- log_open(tmp) 
-log_print('Telomere Analyzer  version v1.1.8-beta 2026-02-19', hide_notes = TRUE, console = FALSE) # Send message to log
+log_print('Telomere Analyzer  version v1.1.9-beta 2026-02-19', hide_notes = TRUE, console = FALSE) # Send message to log
 t1 <- Sys.time()
 log_print(base::paste("Work started at:", toString(t1)), hide_notes = TRUE, console = FALSE) # Send message to log
 
