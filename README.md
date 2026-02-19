@@ -88,8 +88,9 @@ Smoom R., May C.L., Ortiz V., Tigue, M., Kolev H., Reizel Y., Morgan A., Egyes, 
 
 
 # chrMap
-### This script help to filter NAnoTel results with minimap2 alignment using The dorado aligner summary file. (workd for dorado version 1.3.1 or newer +  and NanoTel version v1.1.4-beta or newer.)
+### This script help to filter NAnoTel results with minimap2 alignment using The dorado aligner summary file. (works for dorado version 1.3.1 or newer +  and NanoTel version v1.1.4-beta or newer.)
 See details using the --help flag.
+Still under developments...
 
 
 
