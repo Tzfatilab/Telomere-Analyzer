@@ -95,8 +95,8 @@ option_list = list(
   make_option("--min_alignment_coverage_thr", action = "store", default = NULL, 
               type = "double", 
               help = "Minimal threshold for The subtelomere coverage: abs(alignment_coverage - subtelomere_length/read_length) <= threshold  or  
-              abs(alignment_coverage - genome_edges_length) <= threshold if subtelomere length > genome_edges_length 
-              This flag can only be used with a given genome_edges_length number!",
+              abs(genome_edges_length/sequence_length - alignment_coverage) <= threshold if subtelomere length > genome_edges_length 
+              This flag can only be used with a given genome_edges_length number!", 
               metavar = "Alignmnet coverage threshold"), 
   
   # todo : add a logical which tells if it is right or left
@@ -141,7 +141,7 @@ opt = parse_args(OptionParser(option_list=option_list))
 
 # Handle --version flag
 if (opt$version) {
-  cat("Telomere Analyzer  version v1.1.8-beta 2026-02-19\n")
+  cat("Telomere Analyzer  version v1.1.9-beta 2026-02-19\n")
   quit(save = "no", status = 0)
 }  
 
@@ -383,7 +383,7 @@ tmp <- file.path(opt$save_path, "run.log")
 
 # Open log
 lf <- log_open(tmp)
-log_print('Telomere Analyzer  version v1.1.8-beta 2026-02-19', hide_notes = TRUE, console = FALSE) 
+log_print('Telomere Analyzer  version v1.1.9-beta 2026-02-19', hide_notes = TRUE, console = FALSE) 
 
 # optional filterations:
 #' 1.  alignment_genome != '*' This is must filter 
@@ -395,6 +395,8 @@ log_print('Telomere Analyzer  version v1.1.8-beta 2026-02-19', hide_notes = TRUE
 #' 7.  alignment_mapping_quality v [0,60] int   
 mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome' , thr=NULL, genome_length=NULL, telo_index="telomere", telo_right=FALSE)
 {
+  
+  
   if(is.null(filter)){ return(df_join)}
   if(filter==FALSE){ return(df_join)}
   
@@ -441,8 +443,8 @@ mapping_filter <- function(df_join, filter=NULL,filter_column='alignment_genome'
   if(filter_column == 'alignment_coverage') {
     #df_join <- calculate_subtelo(df_join)
     df_join <- df_join %>% 
-      mutate( pass_alignment_coverage = if_else(subtelo_length <= genome_length,
-            (abs(subtelo_length/sequence_length - alignment_coverage) < thr ), abs(alignment_coverage - genome_length) <= thr)
+      mutate( pass_alignment_coverage = if_else(subtelo_length <= genome_length ,
+            (abs(subtelo_length/sequence_length - alignment_coverage) <= thr ), abs(genome_length/sequence_length - alignment_coverage) <= thr)
               ) # end of mutate
     log_print(paste(sum(df_join$pass_alignment_coverage), "reads pass the alignment coverage filteration of", thr, " which is the diffrence between alignment coverage and sub-telomere coverage!"), console = FALSE, hide_notes = TRUE)
     # sum( abs( (subtelo_length2 / df_pass_genome$sequence_length) - df_pass_genome$alignment_coverage ) <0.2 )
