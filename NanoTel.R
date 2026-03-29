@@ -80,11 +80,15 @@ option_list = list(
               help = "Space separated list of additional pattern(s) for Telomere variant repeats. Must be in double quotes.", 
               metavar = " Telomere variant repeats patterns"), 
   
-  make_option("--version", 
-              action = "store_true", 
+  make_option("--version",
+              action = "store_true",
               default = FALSE,
-              help = "Print version information and exit")
-  
+              help = "Print version information and exit"),
+
+  make_option("--analysis", action = "store_true", default = FALSE,
+              help = "Run post-processing filtration and produce filtered summary, stats txt, and plot.",
+              metavar = "Run analysis")
+
 )   
 opt = parse_args(OptionParser(option_list=option_list))
 
@@ -2408,8 +2412,82 @@ if(!is.null(cur_tvr_patterns)) {
 }
 
 
-write_csv(x = ans_list$df_summary, file = file.path(opt$save_path,"summary.csv"))
+barcode_name <- basename(normalizePath(opt$input_path, mustWork = FALSE))
+write_csv(x = ans_list$df_summary,
+          file = file.path(opt$save_path, paste0(barcode_name, "_summary.csv")))
 write_lines(x = ans_list$df_summary$sequence_ID  , file = file.path(opt$save_path, "reads_ids.txt"))
+
+# =====================================================================
+# POST-PROCESSING ANALYSIS (only runs when --analysis flag is set)
+# =====================================================================
+if (isTRUE(opt$analysis)) {
+
+  # --- Step 1: Filter ---
+  df_filtered <- ans_list$df_summary %>%
+    dplyr::filter(telo_density_mismatch >= 0.75,
+                  Telomere_start_mismatch <= 134) %>%
+
+    # --- Step 2: Sort by sequence length descending ---
+    dplyr::arrange(desc(sequence_length)) %>%
+
+    # --- Step 3: Add running median and difference columns ---
+    dplyr::mutate(
+      TelLenMM_RunningMed = sapply(seq_len(dplyr::n()),
+                                    function(i) median(Telomere_length_mismatch[1:i])),
+      SeqLen_minus_RunMed = sequence_length - TelLenMM_RunningMed
+    ) %>%
+
+    # --- Step 4: Remove rows where difference < 134 ---
+    dplyr::filter(SeqLen_minus_RunMed >= 134)
+
+  # Write filtered sorted summary
+  write_csv(x = df_filtered,
+            file = file.path(opt$save_path,
+                             paste0(barcode_name, "_filtered_sorted_summary.csv")))
+
+  # --- Stats .txt ---
+  n_reads   <- nrow(df_filtered)
+  med_telo  <- median(df_filtered$Telomere_length_mismatch)
+  pct_short <- round(100 * sum(df_filtered$Telomere_length_mismatch < 2000) / n_reads, 1)
+
+  results_lines <- c(
+    paste0("Results for ", barcode_name),
+    "==========================================",
+    paste0("Number of telomeric reads after filtration : ", n_reads),
+    paste0("Median telomere length with mismatch (bp)  : ", med_telo),
+    paste0("% of telomeres shorter than 2kb            : ", pct_short, "%")
+  )
+  write_lines(results_lines,
+              file.path(opt$save_path, paste0(barcode_name, ".txt")))
+
+  # --- Telomere plot ---
+  df_plot <- df_filtered %>%
+    dplyr::mutate(read_index = seq_len(dplyr::n()))
+
+  p_telo <- ggplot(df_plot, aes(x = read_index)) +
+    geom_line(aes(y = sequence_length,          color = "Read Length")) +
+    geom_line(aes(y = Telomere_length_mismatch, color = "Telomere Length (mismatch)")) +
+    geom_line(aes(y = TelLenMM_RunningMed,      color = "Running Median Telomere Length")) +
+    scale_color_manual(
+      values = c("Read Length"                    = "#E8735A",
+                 "Telomere Length (mismatch)"     = "#228B22",
+                 "Running Median Telomere Length" = "#4169E1")
+    ) +
+    labs(title = "Telomere Analysis",
+         x     = "Read (sorted by length, longest to shortest)",
+         y     = "Length (bp)",
+         color = NULL) +
+    theme_prism() +
+    theme(legend.position = "bottom")
+
+  ggsave(
+    filename = file.path(opt$save_path, paste0(barcode_name, "_telomere_plot.png")),
+    plot     = p_telo,
+    width    = 12, height = 6, dpi = 150
+  )
+
+} # end --analysis block
+
 t2 <- Sys.time()
 
 
