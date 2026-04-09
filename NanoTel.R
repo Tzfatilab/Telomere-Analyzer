@@ -102,12 +102,27 @@ if (opt$version) {
 
 # The 'confilcted' package tries to make your function choice explicit.
 #   it produce an error if a function name is found on 2 or more packages!!!
-suppressPackageStartupMessages(require(S4Vectors))
 suppressPackageStartupMessages(require(BiocGenerics))
-suppressPackageStartupMessages(require(conflicted))
-suppressPackageStartupMessages(require(Biostrings))
-suppressPackageStartupMessages(require(tidyverse))
+suppressPackageStartupMessages(require(S4Vectors))
 suppressPackageStartupMessages(require(IRanges))
+suppressPackageStartupMessages(require(Biostrings))
+suppressPackageStartupMessages(require(conflicted))
+suppressPackageStartupMessages(require(tidyverse))
+# Fallback: if tidyverse failed to load (e.g. missing ragg system lib on Linux),
+# load its core packages individually so the script can still run.
+if (!isNamespaceLoaded("purrr")) {
+  for (pkg in c("dplyr","ggplot2","tidyr","readr","purrr","tibble","stringr","forcats","lubridate")) {
+    suppressPackageStartupMessages(require(pkg, character.only = TRUE))
+  }
+}
+# purrr removed compose() in v1.0.0 — define it here as a compatibility shim
+# so the script works with any purrr version.
+if (!exists("compose", mode = "function")) {
+  compose <- function(...) {
+    fns <- rev(list(...))
+    function(x) Reduce(function(v, f) f(v), fns, x)
+  }
+}
 suppressPackageStartupMessages(require(parallel))
 suppressPackageStartupMessages(require(logr))
 suppressPackageStartupMessages(require(future))
@@ -2435,9 +2450,14 @@ if (isTRUE(opt$analysis)) {
       TelLenMM_RunningMed = sapply(seq_len(dplyr::n()),
                                     function(i) median(Telomere_length_mismatch[1:i])),
       SeqLen_minus_RunMed = sequence_length - TelLenMM_RunningMed
-    ) %>%
+    )
 
-    # --- Step 4: Remove rows where difference < 134 ---
+  # Save pre-final-filter data for the plot (shows the full x-range up to the crossing point)
+  df_for_plot <- df_filtered %>%
+    dplyr::mutate(read_index = seq_len(dplyr::n()))
+
+  # --- Step 4: Remove rows where difference < 134 ---
+  df_filtered <- df_filtered %>%
     dplyr::filter(SeqLen_minus_RunMed >= 134)
 
   # Write filtered sorted summary
@@ -2458,11 +2478,10 @@ if (isTRUE(opt$analysis)) {
     paste0("% of telomeres shorter than 2kb            : ", pct_short, "%")
   )
   write_lines(results_lines,
-              file.path(opt$save_path, paste0(barcode_name, ".txt")))
+              file.path(opt$save_path, paste0(barcode_name, "_results.txt")))
 
-  # --- Telomere plot ---
-  df_plot <- df_filtered %>%
-    dplyr::mutate(read_index = seq_len(dplyr::n()))
+  # --- Telomere plot (uses pre-final-filter data so x-axis extends to the crossing point) ---
+  df_plot <- df_for_plot
 
   p_telo <- ggplot(df_plot, aes(x = read_index)) +
     geom_line(aes(y = sequence_length,          color = "Read Length")) +
