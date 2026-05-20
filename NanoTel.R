@@ -87,7 +87,14 @@ option_list = list(
 
   make_option("--analysis", action = "store_true", default = FALSE,
               help = "Run post-processing filtration and produce filtered summary, stats txt, and plot.",
-              metavar = "Run analysis")
+              metavar = "Run analysis"),
+
+  make_option("--bias_prediction_model", action = "store", type = "character",
+              default = NULL,
+              help = paste("Path to the calibration .rds used for expected KM bias prediction.",
+                           "Defaults to models/calibration_obj.rds relative to the script directory.",
+                           "Override via this flag or a lab config file."),
+              metavar = "calibration model path")
 
 )   
 opt = parse_args(OptionParser(option_list=option_list))
@@ -129,6 +136,20 @@ suppressPackageStartupMessages(require(future))
 suppressPackageStartupMessages(require(ggprism))
 
 suppressPackageStartupMessages(require(testit))
+suppressPackageStartupMessages(require(survival))
+
+# Minimum margin (bp) between sequence end and telomere end for a read to be
+# considered a complete (non-censored) event in the KM survival fit.
+BUFFER <- 100L
+
+# Resolve the directory containing this script so that bundled model files
+# (e.g. models/calibration_obj.rds) can be referenced relative to the repo
+# root rather than via absolute machine-specific paths.
+.script_dir <- tryCatch({
+  args <- commandArgs(trailingOnly = FALSE)
+  file_flag <- grep("--file=", args, value = TRUE)
+  if (length(file_flag) > 0) dirname(normalizePath(sub("--file=", "", file_flag[1]))) else getwd()
+}, error = function(e) getwd())
 
 #utils::globalVariables(c("start_index"))
 
@@ -2466,16 +2487,64 @@ if (isTRUE(opt$analysis)) {
                              paste0(barcode_name, "_filtered_sorted_summary.csv")))
 
   # --- Stats .txt ---
-  n_reads   <- nrow(df_filtered)
+
+  # KM survival fit: event = 1 when the telomere is fully captured in the read
+  # (enough margin between sequence end and telomere end), 0 = censored.
+  df_filtered <- df_filtered %>%
+    dplyr::mutate(
+      margin = sequence_length - Telomere_end_mismatch,
+      event  = as.integer(margin >= BUFFER)
+    )
+
+  n_reads        <- nrow(df_filtered)
+  n_complete     <- sum(df_filtered$event == 1)
+  n_censored     <- sum(df_filtered$event == 0)
+  censoring_rate <- n_censored / n_reads
+
   med_telo  <- median(df_filtered$Telomere_length_mismatch)
   pct_short <- round(100 * sum(df_filtered$Telomere_length_mismatch < 2000) / n_reads, 1)
+  min_len   <- min(df_filtered$sequence_length)
+  max_len   <- max(df_filtered$sequence_length)
+
+  # KM median
+  km_fit    <- survfit(Surv(Telomere_length_mismatch, event) ~ 1, data = df_filtered)
+  km_median <- summary(km_fit)$table[["median"]]
+
+  # Expected KM bias from polynomial calibration model
+  model_path <- if (!is.null(opt$bias_prediction_model)) {
+    opt$bias_prediction_model
+  } else {
+    file.path(.script_dir, "models", "poly_regression_model.rds")
+  }
+  calibration_obj  <- readRDS(model_path)
+  expected_bias    <- predict(
+    calibration_obj$calibration_models$fit_km_bias,
+    newdata = data.frame(
+      censoring_for_model = censoring_rate,
+      log10_n_reads       = log10(n_reads)
+    )
+  )
+  bias_label <- ifelse(expected_bias >= 0,
+                       paste0("+", round(expected_bias), " bp"),
+                       paste0(round(expected_bias), " bp"))
+
+  fmt <- function(x) format(round(x), big.mark = ",", scientific = FALSE)
 
   results_lines <- c(
     paste0("Results for ", barcode_name),
     "==========================================",
-    paste0("Number of telomeric reads after filtration : ", n_reads),
-    paste0("Median telomere length with mismatch (bp)  : ", med_telo),
-    paste0("% of telomeres shorter than 2kb            : ", pct_short, "%")
+    paste0("Total Reads             : ", fmt(n_reads)),
+    paste0("Complete Reads          : ", fmt(n_complete)),
+    paste0("Censored Reads          : ", fmt(n_censored)),
+    paste0("Censoring Rate          : ", round(100 * censoring_rate, 1), "%"),
+    "",
+    paste0("Regular Median          : ", fmt(med_telo), " bp"),
+    paste0("KM Median               : ", fmt(km_median), " bp"),
+    "",
+    paste0("Expected KM Median Bias : ", bias_label),
+    paste0("Min Read Length         : ", fmt(min_len), " bp"),
+    paste0("Max Read Length         : ", fmt(max_len), " bp"),
+    paste0("% < 2kb                 : ", pct_short, "%")
   )
   write_lines(results_lines,
               file.path(opt$save_path, paste0(barcode_name, "_results.txt")))
