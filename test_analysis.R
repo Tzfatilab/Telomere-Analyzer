@@ -18,7 +18,13 @@ suppressPackageStartupMessages({
   library(survival)
 })
 
-BUFFER <- 100L
+BUFFER <- 50L
+
+.script_dir <- tryCatch({
+  args <- commandArgs(trailingOnly = FALSE)
+  file_flag <- grep("--file=", args, value = TRUE)
+  if (length(file_flag) > 0) dirname(normalizePath(sub("--file=", "", file_flag[1]))) else getwd()
+}, error = function(e) getwd())
 
 option_list <- list(
   make_option("--summary_csv", type = "character", default = NULL,
@@ -52,13 +58,23 @@ df_summary <- read_csv(opt$summary_csv, show_col_types = FALSE)
 cat("Rows in input CSV:", nrow(df_summary), "\n")
 
 # ---- Step 1: Filter ---------------------------------------------------------
-df_filtered <- df_summary %>%
+df_step1_filtered <- df_summary %>%
   dplyr::filter(telo_density_mismatch >= 0.75,
                 Telomere_start_mismatch <= 134)
-cat("Rows after density/start filter:", nrow(df_filtered), "\n")
+cat("Rows after density/start filter:", nrow(df_step1_filtered), "\n")
+
+# KM median is computed after the density/start filter and before the
+# running-median filtration steps.
+df_km <- df_step1_filtered %>%
+  dplyr::mutate(
+    margin = sequence_length - Telomere_end_mismatch,
+    event  = as.integer(margin >= BUFFER)
+  )
+km_fit    <- survfit(Surv(Telomere_length_mismatch, event) ~ 1, data = df_km)
+km_median <- summary(km_fit)$table[["median"]]
 
 # ---- Step 2: Sort by sequence_length descending -----------------------------
-df_filtered <- df_filtered %>%
+df_filtered <- df_step1_filtered %>%
   dplyr::arrange(desc(sequence_length))
 
 # ---- Step 3: Running median + difference column -----------------------------
@@ -101,15 +117,14 @@ pct_short <- round(100 * sum(df_filtered$Telomere_length_mismatch < 2000) / n_re
 min_len   <- min(df_filtered$sequence_length)
 max_len   <- max(df_filtered$sequence_length)
 
-# KM median
-km_fit    <- survfit(Surv(Telomere_length_mismatch, event) ~ 1, data = df_filtered)
-km_median <- summary(km_fit)$table[["median"]]
-
+# WORK IN PROGRESS: the model-based expected KM bias calculation below is a
+# provisional working feature, not the final calibrated implementation.
+# Keep it functional for now, but treat this block as subject to revision.
 # Expected KM bias from polynomial calibration model
 model_path <- if (!is.null(opt$bias_prediction_model)) {
   opt$bias_prediction_model
 } else {
-  file.path(dirname(normalizePath(sys.frames()[[1]]$ofile %||% ".")), "models", "poly_regression_model.rds")
+  file.path(.script_dir, "models", "poly_regression_model.rds")
 }
 calibration_obj <- readRDS(model_path)
 expected_bias   <- predict(
@@ -133,7 +148,7 @@ results_lines <- c(
   paste0("Censored Reads          : ", fmt(n_censored)),
   paste0("Censoring Rate          : ", round(100 * censoring_rate, 1), "%"),
   "",
-  paste0("Regular Median          : ", fmt(med_telo), " bp"),
+  paste0("Regular Median (post-filtration) : ", fmt(med_telo), " bp"),
   paste0("KM Median               : ", fmt(km_median), " bp"),
   "",
   paste0("Expected KM Median Bias : ", bias_label),

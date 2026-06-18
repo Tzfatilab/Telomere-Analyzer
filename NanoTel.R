@@ -140,7 +140,7 @@ suppressPackageStartupMessages(require(survival))
 
 # Minimum margin (bp) between sequence end and telomere end for a read to be
 # considered a complete (non-censored) event in the KM survival fit.
-BUFFER <- 100L
+BUFFER <- 50L
 
 # Resolve the directory containing this script so that bundled model files
 # (e.g. models/calibration_obj.rds) can be referenced relative to the repo
@@ -2459,9 +2459,21 @@ write_lines(x = ans_list$df_summary$sequence_ID  , file = file.path(opt$save_pat
 if (isTRUE(opt$analysis)) {
 
   # --- Step 1: Filter ---
-  df_filtered <- ans_list$df_summary %>%
+  df_step1_filtered <- ans_list$df_summary %>%
     dplyr::filter(telo_density_mismatch >= 0.75,
-                  Telomere_start_mismatch <= 134) %>%
+                  Telomere_start_mismatch <= 134)
+
+  # KM median is computed after the density/start filter and before the
+  # running-median filtration steps.
+  df_km <- df_step1_filtered %>%
+    dplyr::mutate(
+      margin = sequence_length - Telomere_end_mismatch,
+      event  = as.integer(margin >= BUFFER)
+    )
+  km_fit    <- survfit(Surv(Telomere_length_mismatch, event) ~ 1, data = df_km)
+  km_median <- summary(km_fit)$table[["median"]]
+
+  df_filtered <- df_step1_filtered %>%
 
     # --- Step 2: Sort by sequence length descending ---
     dplyr::arrange(desc(sequence_length)) %>%
@@ -2506,10 +2518,9 @@ if (isTRUE(opt$analysis)) {
   min_len   <- min(df_filtered$sequence_length)
   max_len   <- max(df_filtered$sequence_length)
 
-  # KM median
-  km_fit    <- survfit(Surv(Telomere_length_mismatch, event) ~ 1, data = df_filtered)
-  km_median <- summary(km_fit)$table[["median"]]
-
+  # WORK IN PROGRESS: the model-based expected KM bias calculation below is a
+  # provisional working feature, not the final calibrated implementation.
+  # Keep it functional for now, but treat this block as subject to revision.
   # Expected KM bias from polynomial calibration model
   model_path <- if (!is.null(opt$bias_prediction_model)) {
     opt$bias_prediction_model
@@ -2538,7 +2549,7 @@ if (isTRUE(opt$analysis)) {
     paste0("Censored Reads          : ", fmt(n_censored)),
     paste0("Censoring Rate          : ", round(100 * censoring_rate, 1), "%"),
     "",
-    paste0("Regular Median          : ", fmt(med_telo), " bp"),
+    paste0("Regular Median (post-filtration) : ", fmt(med_telo), " bp"),
     paste0("KM Median               : ", fmt(km_median), " bp"),
     "",
     paste0("Expected KM Median Bias : ", bias_label),
